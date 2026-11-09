@@ -634,7 +634,7 @@ export default function Home() {
 
     for (const candidate of zoneSeats) {
       if (seatsToBook.length >= qty) break;
-      if (candidate.id !== primarySeat.id && candidate.status !== 'MAINTENANCE') {
+      if (candidate.id !== primarySeat.id && candidate.defaultStatus !== 'MAINTENANCE') {
         seatsToBook.push(candidate);
       }
     }

@@ -413,11 +413,11 @@ function CyberMenuClientContent() {
         const st = getActiveClientStation();
         setAccountBalance(w.balance);
         setStationHourlyRate(st?.hourlyRate || w.hourlyRate || 12000);
-        if (st?.zoneName) {
-          setStationZone(st.zoneName);
+        if (st?.zone || w.zoneName) {
+          setStationZone(st?.zone || w.zoneName);
         }
         if (!seatParam) {
-          setWalletPcName(st?.id || w.pcName);
+          setWalletPcName(st?.stationId || w.pcName);
         }
       } catch {}
     };

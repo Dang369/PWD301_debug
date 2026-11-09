@@ -114,9 +114,9 @@ export function getRegisteredAccounts(): RegisteredAccount[] {
       }
       // Khởi tạo số dư hợp lệ và đồng bộ đúng cấp bậc Gamer Pass theo số dư thực tế
       let newBal = typeof acc.balance === 'number' && !isNaN(acc.balance) ? acc.balance : 0;
-      let newTier = acc.userTier || calculateTierByBalance(newBal);
+      let newTier = acc.userTier || determineTierByAmount(newBal).name;
       if (newUname.toLowerCase() === 'admin2' && newBal < 1500000 && newTier.includes('KIM CƯƠNG')) {
-        newTier = calculateTierByBalance(newBal);
+        newTier = determineTierByAmount(newBal).name;
         changed = true;
       }
 
@@ -311,7 +311,7 @@ export function getLoggedInUser(): AuthUser | null {
     }
 
     if (user.username.toLowerCase() === 'admin2' && user.balance < 1500000 && user.userTier?.includes('KIM CƯƠNG')) {
-      user.userTier = calculateTierByBalance(user.balance);
+      user.userTier = determineTierByAmount(user.balance).name;
       localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(user));
     }
 
