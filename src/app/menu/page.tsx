@@ -472,9 +472,16 @@ function CyberMenuClientContent() {
             (o.status === 'PENDING' || o.status === 'COOKING' || o.status === 'READY')
         );
         if (activeOrder) {
+          const cancelledSet = new Set(
+            Array.isArray(activeOrder.cancelledIndices) ? activeOrder.cancelledIndices : []
+          );
+          const activeItems = activeOrder.items.filter((_, idx) => !cancelledSet.has(idx));
           setCurrentTicker({
             orderCode: `#KDS-${activeOrder.orderNumber}`,
-            description: activeOrder.items.join(' + '),
+            description:
+              cancelledSet.size > 0
+                ? `${activeItems.join(' + ')} (Đã hủy ${cancelledSet.size} món hết)`
+                : activeItems.join(' + '),
             eta:
               activeOrder.status === 'READY'
                 ? 'Đang bưng ra máy!'
@@ -617,6 +624,17 @@ function CyberMenuClientContent() {
     const isAllDrinkOrder =
       cart.length > 0 && cart.every((c) => c.categoryId === 'nuoc-uong');
 
+    const rawCartSub = cart.reduce((s, c) => s + c.price * c.qty, 0);
+    let runningPriceSum = 0;
+    const itemPrices = cart.map((c, idx) => {
+      if (idx === cart.length - 1) {
+        return Math.max(0, total - runningPriceSum);
+      }
+      const p = rawCartSub > 0 ? Math.round(((c.price * c.qty) / rawCartSub) * total) : 0;
+      runningPriceSum += p;
+      return p;
+    });
+
     const newKdsOrder = {
       id: `ord-${newOrderNumber}`,
       orderNumber: newOrderNumber,
@@ -625,6 +643,8 @@ function CyberMenuClientContent() {
       status: 'PENDING' as const,
       paymentMethod,
       totalAmount: total,
+      originalTotalAmount: total,
+      itemPrices,
       timeElapsed: '00:01',
       note: note || undefined,
       station: isAllDrinkOrder ? ('BAR' as const) : ('HOT_KITCHEN' as const),

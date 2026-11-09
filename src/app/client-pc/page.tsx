@@ -425,6 +425,8 @@ export default function ClientPcPage() {
     orderNumber: number | string;
     pcName: string;
     items?: any[];
+    cancelledItems?: any[];
+    refundedAmount?: number;
   } | null>(null);
 
   const [activePlayingGame, setActivePlayingGame] = useState<string | null>(null);
@@ -506,6 +508,8 @@ export default function ClientPcPage() {
         orderNumber: detail.orderNumber,
         pcName: detail.pcName || currentStation.id,
         items: detail.items || [],
+        cancelledItems: detail.cancelledItems || [],
+        refundedAmount: detail.refundedAmount || 0,
       });
     };
 
@@ -523,6 +527,8 @@ export default function ClientPcPage() {
             orderNumber: parsed.orderNumber,
             pcName: parsed.pcName || currentStation.id,
             items: parsed.items || [],
+            cancelledItems: parsed.cancelledItems || [],
+            refundedAmount: parsed.refundedAmount || 0,
           });
         }
       }
@@ -1503,11 +1509,21 @@ export default function ClientPcPage() {
               <span className="material-symbols-outlined text-2xl text-slate-950 animate-spin">soup_kitchen</span>
               <div>
                 <span className="text-sm uppercase font-gaming block tracking-wide">
-                  🔔 BẾP TRẠM KDS THÔNG BÁO: ĐƠN #{kdsFoodNotice.orderNumber}
+                  🔔 BẾP TRẠM KDS THÔNG BÁO: ĐƠN #{kdsFoodNotice.orderNumber} ({kdsFoodNotice.items?.length || 0} MÓN ĐANG GIAO)
                 </span>
-                <span className="text-[11px] font-sans font-bold text-slate-950">
-                  Món của bạn đã chế biến xong, runner đang bưng tới máy {kdsFoodNotice.pcName}! Chúc bạn ngon miệng và chiến game vui vẻ!
+                <span className="text-[11px] font-sans font-bold text-slate-950 block">
+                  {kdsFoodNotice.items && kdsFoodNotice.items.length > 0
+                    ? `Đang bưng tới máy ${kdsFoodNotice.pcName}: ${kdsFoodNotice.items.join(' • ')}`
+                    : `Món của bạn đã chế biến xong, runner đang bưng tới máy ${kdsFoodNotice.pcName}!`}
                 </span>
+                {kdsFoodNotice.cancelledItems && kdsFoodNotice.cancelledItems.length > 0 ? (
+                  <span className="text-[11px] font-sans font-black text-rose-900 block mt-0.5">
+                    ⚠️ Món báo hết ({kdsFoodNotice.cancelledItems.length}): {kdsFoodNotice.cancelledItems.join(', ')}
+                    {kdsFoodNotice.refundedAmount && kdsFoodNotice.refundedAmount > 0
+                      ? ` — Đã hoàn trả +${kdsFoodNotice.refundedAmount.toLocaleString('vi-VN')}đ vào Ví!`
+                      : ''}
+                  </span>
+                ) : null}
               </div>
             </div>
             <button

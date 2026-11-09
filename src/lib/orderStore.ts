@@ -11,6 +11,85 @@ export const INITIAL_ORDERS: Order[] = [];
 export const BASELINE_REVENUE = 0;
 export const BASELINE_COMPLETED_ORDERS = 0;
 
+const MENU_BASE_PRICES: Record<string, number> = {
+  'Mì Cay Hải Sản Kim Chi Cấp 1-7': 59000,
+  'Mì Trộn Indomie Double Trứng Lòng Đào': 38000,
+  'Mì Trộn Indomie Bò Băm Phô Mai Tan Chảy': 45000,
+  'Mì Xào Bò Cải Ngọt Giòn Cay': 45000,
+  'Mì Trộn Hàn Quốc Sốt Tương Đen Jajangmyeon': 42000,
+  'Mì Udon Bò Mỹ Sốt Cay Nhật Bản': 52000,
+  'Mì Trộn Tôm Thịt Sa Tế Siêu Cay': 45000,
+  'Mì Gà Cay Samyang Phô Mai Kéo Sợi': 48000,
+  'Cơm Bò Lúc Lắc Phô Mai Trứng Ốp La': 55000,
+  'Cơm Gà Xối Mỡ Da Giòn (Đùi Góc Tư)': 48000,
+  'Bánh Mì Chảo Đặc Biệt Cybernet': 45000,
+  'Cơm Chiên Dương Châu Hải Sản Tóp Mỡ': 42000,
+  'Cơm Thịt Heo Chiên Xù Tonkatsu Sốt Curry': 50000,
+  'Cơm Sườn Non Rim Mặn Ngọt Trứng Chiên': 48000,
+  'Cơm Trộn Hàn Quốc Bibimbap Bò Trứng Lòng Đào': 48000,
+  'Monster Energy Ultra Lạnh (Kèm Ly Đá)': 35000,
+  'Trà Đào Cam Sả Khổng Lồ 1 Lít': 28000,
+  'Sting Dâu Lạnh Ly Siêu To Kèm Thạch': 20000,
+  'Trà Sữa Cyber Full Topping Trân Châu Phô Mai': 32000,
+  'Red Bull Thái Lạnh (Kèm Ly Đá Bạc Hà)': 25000,
+  'Cà Phê Muối Kem Béo Cyber Signature': 28000,
+  'Soda Việt Quất Chanh Bạc Hà Mát Lạnh': 28000,
+  'Khoai Tây Lắc Trứng Muối Phô Mai': 28000,
+  'Xúc Xích Đức Nướng Phô Mai Tan Chảy': 25000,
+  'Cá Viên Chiên Thập Cẩm Chấm Sốt Me Cay': 30000,
+  'Gà Popcorn Chiên Giòn Sốt Cay Phô Mai': 35000,
+  'Bánh Tráng Cuộn Bơ Trứng Cút Tép Khô': 25000,
+  'Phô Mai Que Chiên Giòn Kéo Sợi (4 Thanh)': 30000,
+  'Combo Thức Đêm Chiến Game (-20%)': 69000,
+};
+
+export function estimateOrderItemPrices(ord: Order): number[] {
+  const baseTotal = ord.originalTotalAmount || ord.totalAmount || 0;
+  if (Array.isArray(ord.itemPrices) && ord.itemPrices.length === ord.items.length) {
+    return ord.itemPrices;
+  }
+  if (!ord.items || ord.items.length === 0) return [];
+
+  const rawPrices = ord.items.map((item) => {
+    if (typeof item !== 'string' && typeof item.unitPrice === 'number') {
+      return item.unitPrice * (item.quantity || 1);
+    }
+    const str = typeof item === 'string' ? item : item.name || '';
+    const m = str.match(/^(\d+)x\s*(.*)$/);
+    const qty = m ? parseInt(m[1], 10) : 1;
+    const rest = m ? m[2].trim() : str.trim();
+
+    for (const [menuName, unitPrice] of Object.entries(MENU_BASE_PRICES)) {
+      if (rest.startsWith(menuName)) {
+        return unitPrice * qty;
+      }
+    }
+    const cleanName = rest.split('(')[0].trim();
+    if (MENU_BASE_PRICES[cleanName]) {
+      return MENU_BASE_PRICES[cleanName] * qty;
+    }
+    return Math.round(baseTotal / ord.items.length);
+  });
+
+  const rawSum = rawPrices.reduce((s, p) => s + p, 0);
+  if (rawSum <= 0) {
+    const even = Math.round(baseTotal / ord.items.length);
+    return ord.items.map((_, i) =>
+      i === ord.items.length - 1 ? baseTotal - even * (ord.items.length - 1) : even
+    );
+  }
+
+  let runningSum = 0;
+  return rawPrices.map((p, idx) => {
+    if (idx === rawPrices.length - 1) {
+      return Math.max(0, baseTotal - runningSum);
+    }
+    const scaled = Math.round((p / rawSum) * baseTotal);
+    runningSum += scaled;
+    return scaled;
+  });
+}
+
 export function getStoredOrders(): Order[] {
   if (typeof window === 'undefined') return INITIAL_ORDERS;
 
@@ -61,11 +140,46 @@ export function updateOrderStatus(
       const isDelivered = nextStatus === 'DELIVERED';
       const isCancelled = nextStatus === 'CANCELLED';
       const allIndices = ord.items.map((_, idx) => idx);
+      const prevChecked = Array.isArray(ord.checkedIndices) ? ord.checkedIndices : [];
+      const prevCancelled = Array.isArray(ord.cancelledIndices) ? ord.cancelledIndices : [];
+
+      let nextChecked = prevChecked;
+      let nextCancelled = prevCancelled;
+      let nextTotalAmount = ord.totalAmount;
+      let nextOriginalTotal = ord.originalTotalAmount || ord.totalAmount;
+      let nextRefundedAmount = ord.refundedAmount || 0;
+      const itemPrices = estimateOrderItemPrices(ord);
+
+      if (isReady && ord.status === 'COOKING') {
+        if (prevChecked.length > 0 && prevChecked.length < ord.items.length) {
+          // Bếp chỉ chọn một phần món (ví dụ 2/3 món), các món không được chọn chuyển sang danh sách báo hết / hủy lẻ
+          nextChecked = prevChecked;
+          nextCancelled = allIndices.filter((i) => !prevChecked.includes(i));
+          const deliveredSum = nextChecked.reduce((sum, idx) => sum + (itemPrices[idx] || 0), 0);
+          nextRefundedAmount = Math.max(0, nextOriginalTotal - deliveredSum);
+          nextTotalAmount = deliveredSum;
+        } else {
+          // Đã chọn đủ 100% món
+          nextChecked = allIndices;
+          nextCancelled = [];
+        }
+      } else if (isDelivered) {
+        // Giữ nguyên các món đã hoàn thành và các món bị hủy lẻ từ bước READY
+        nextChecked =
+          prevChecked.length > 0
+            ? prevChecked
+            : allIndices.filter((i) => !prevCancelled.includes(i));
+      }
 
       return {
         ...ord,
         status: nextStatus,
-        checkedIndices: isReady || isDelivered ? allIndices : ord.checkedIndices || [],
+        itemPrices,
+        checkedIndices: nextChecked,
+        cancelledIndices: nextCancelled,
+        totalAmount: nextTotalAmount,
+        originalTotalAmount: nextOriginalTotal,
+        refundedAmount: nextRefundedAmount,
         cookingStartedAt: isStartingCooking ? nowIso : ord.cookingStartedAt,
         completedAt: isReady || isDelivered ? (ord.completedAt || nowIso) : ord.completedAt,
         deliveredAt: isDelivered ? (ord.deliveredAt || nowIso) : ord.deliveredAt,
@@ -196,7 +310,10 @@ export function calculateLiveDashboardStats(
   }
 
   completedOrders.forEach((ord) => {
-    ord.items.forEach((item) => {
+    const cancelledSet = new Set(Array.isArray(ord.cancelledIndices) ? ord.cancelledIndices : []);
+    const itemPrices = estimateOrderItemPrices(ord);
+    ord.items.forEach((item, idx) => {
+      if (cancelledSet.has(idx)) return;
       const itemStr = typeof item === 'string' ? item : (item as any).name || '';
       const match = itemStr.match(/^(\d+)x\s*(.*)$/);
       const qty = match ? parseInt(match[1], 10) : 1;
@@ -207,7 +324,8 @@ export function calculateLiveDashboardStats(
           itemMap[cleanName] = { count: 0, revenue: 0 };
         }
         itemMap[cleanName].count += qty;
-        itemMap[cleanName].revenue += Math.round(ord.totalAmount / (ord.items.length || 1));
+        itemMap[cleanName].revenue +=
+          itemPrices[idx] || Math.round(ord.totalAmount / (ord.items.length || 1));
       }
     });
   });

@@ -60,7 +60,11 @@ export interface Order {
   totalAmount: number;
   note?: string | null;
   items: (OrderItem | string)[];
+  itemPrices?: number[];
   checkedIndices?: number[];
+  cancelledIndices?: number[];
+  originalTotalAmount?: number;
+  refundedAmount?: number;
   timeElapsed?: string;
   station?: 'HOT_KITCHEN' | 'BAR' | 'SNACK';
   createdAt?: string | Date;

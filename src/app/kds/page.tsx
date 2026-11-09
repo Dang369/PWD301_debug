@@ -7,6 +7,7 @@ import {
   getStoredOrders,
   updateOrderStatus,
   toggleOrderItemCheck,
+  estimateOrderItemPrices,
   clearCompletedOrders,
   resetOrdersToDefault,
   STORAGE_EVENT_NAME,
@@ -130,6 +131,36 @@ export default function KitchenDisplaySystem() {
       if (!confirm(confirmMsg)) return;
     }
 
+    if (nextStatus === 'READY' && existingOrder.status === 'COOKING') {
+      const checked = Array.isArray(existingOrder.checkedIndices)
+        ? existingOrder.checkedIndices
+        : [];
+
+      if (checked.length === 0) {
+        alert(
+          `Vui lòng chạm vào từng món để tick chọn các món đã chế biến xong trước khi báo giao (hoặc bấm nút "✕ HỦY" nếu hết toàn bộ món)!`
+        );
+        return;
+      }
+
+      if (checked.length < existingOrder.items.length) {
+        const itemPrices = estimateOrderItemPrices(existingOrder);
+        const origTotal = existingOrder.originalTotalAmount || existingOrder.totalAmount;
+        const deliveredSum = checked.reduce((s, idx) => s + (itemPrices[idx] || 0), 0);
+        const refundAmt = Math.max(0, origTotal - deliveredSum);
+        const missingNames = existingOrder.items
+          .filter((_, idx) => !checked.includes(idx))
+          .map((it) => (typeof it === 'string' ? it : it.name || ''));
+
+        const partialMsg =
+          existingOrder.paymentMethod === 'ACCOUNT_BALANCE'
+            ? `Đơn #${existingOrder.orderNumber} (${existingOrder.pcName}) chỉ chọn ${checked.length}/${existingOrder.items.length} món.\n\n• Giao cho khách: ${checked.length} món (${deliveredSum.toLocaleString('vi-VN')}đ)\n• Báo hết / Hủy lẻ (${missingNames.length} món): ${missingNames.join(', ')}\n• Tự động hoàn lại vào Ví khách: +${refundAmt.toLocaleString('vi-VN')}đ\n\nXác nhận chỉ báo giao ${checked.length} món đã chọn?`
+            : `Đơn #${existingOrder.orderNumber} (${existingOrder.pcName}) chỉ chọn ${checked.length}/${existingOrder.items.length} món.\n\n• Giao cho khách: ${checked.length} món\n• Báo hết / Hủy lẻ (${missingNames.length} món): ${missingNames.join(', ')}\n• Giảm tiền thu tại bàn: ${origTotal.toLocaleString('vi-VN')}đ ➔ ${deliveredSum.toLocaleString('vi-VN')}đ (-${refundAmt.toLocaleString('vi-VN')}đ)\n\nXác nhận chỉ báo giao ${checked.length} món đã chọn?`;
+
+        if (!confirm(partialMsg)) return;
+      }
+    }
+
     playSoundEffect(nextStatus === 'READY' || nextStatus === 'DELIVERED' ? 'success' : 'beep');
     const updated = updateOrderStatus(orderId, nextStatus);
     setOrders(updated);
@@ -146,11 +177,32 @@ export default function KitchenDisplaySystem() {
     }
 
     if (nextStatus === 'READY') {
+      const cancelledSet = new Set(
+        Array.isArray(target.cancelledIndices) ? target.cancelledIndices : []
+      );
+      const fulfilledItems = target.items.filter((_, idx) => !cancelledSet.has(idx));
+      const cancelledItems = target.items.filter((_, idx) => cancelledSet.has(idx));
+
+      if (
+        target.paymentMethod === 'ACCOUNT_BALANCE' &&
+        target.refundedAmount &&
+        target.refundedAmount > 0
+      ) {
+        topupWallet(
+          target.refundedAmount,
+          'HOÀN TIỀN F&B',
+          `Hoàn tiền ${cancelledItems.length} món hết hàng đơn #${target.orderNumber}`,
+          target.pcName
+        );
+      }
+
       if (typeof window !== 'undefined') {
         const payload = {
           orderNumber: target.orderNumber,
           pcName: target.pcName,
-          items: target.items,
+          items: fulfilledItems,
+          cancelledItems,
+          refundedAmount: target.refundedAmount || 0,
           timestamp: Date.now(),
         };
         try {
@@ -158,10 +210,17 @@ export default function KitchenDisplaySystem() {
           window.dispatchEvent(new CustomEvent('cyber_kds_food_ready', { detail: payload }));
         } catch {}
       }
+
       setRunnerNotification(
-        `🔔 Đã chế biến xong đơn #${target.orderNumber} (${target.pcName})! Đã phát chuông báo Runner mang món ra bàn.`
+        cancelledItems.length > 0
+          ? `🔔 Đã báo giao ${fulfilledItems.length}/${target.items.length} món đơn #${target.orderNumber} (${target.pcName})! Đã hủy ${cancelledItems.length} món thiếu${
+              target.paymentMethod === 'ACCOUNT_BALANCE' && target.refundedAmount
+                ? ` & hoàn +${target.refundedAmount.toLocaleString('vi-VN')}đ vào ví khách`
+                : ''
+            }.`
+          : `🔔 Đã chế biến xong đủ ${fulfilledItems.length}/${target.items.length} món đơn #${target.orderNumber} (${target.pcName})! Đã phát chuông báo Runner mang món ra bàn.`
       );
-      setTimeout(() => setRunnerNotification(null), 4500);
+      setTimeout(() => setRunnerNotification(null), 5000);
       return;
     }
 
@@ -195,11 +254,18 @@ export default function KitchenDisplaySystem() {
     const targetOrder = orders.find((o) => o.id === orderId);
     if (targetOrder) {
       playSoundEffect('success');
+      const cancelledSet = new Set(
+        Array.isArray(targetOrder.cancelledIndices) ? targetOrder.cancelledIndices : []
+      );
+      const fulfilledItems = targetOrder.items.filter((_, idx) => !cancelledSet.has(idx));
+      const cancelledItems = targetOrder.items.filter((_, idx) => cancelledSet.has(idx));
       if (typeof window !== 'undefined') {
         const payload = {
           orderNumber: targetOrder.orderNumber,
           pcName: targetOrder.pcName,
-          items: targetOrder.items,
+          items: fulfilledItems,
+          cancelledItems,
+          refundedAmount: targetOrder.refundedAmount || 0,
           timestamp: Date.now(),
         };
         try {
@@ -208,7 +274,7 @@ export default function KitchenDisplaySystem() {
         } catch {}
       }
       setRunnerNotification(
-        `🔔 Đã phát lại chuông điều phối Runner mang món đến máy ${targetOrder.pcName}!`
+        `🔔 Đã phát lại chuông điều phối Runner mang ${fulfilledItems.length} món đến máy ${targetOrder.pcName}!`
       );
       setTimeout(() => {
         setRunnerNotification(null);
