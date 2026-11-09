@@ -98,44 +98,43 @@ export default function GlobalNavBar() {
 
       return (
     <>
-      
       {isDedicatedSystem && !isSystemDrawerOpen && !isPinned && (
-        <div className="fixed top-0 left-1/2 -translate-x-1/2 z-[100] pointer-events-auto">
+        <div className="relative z-50 w-full bg-[#020617] border-b border-emerald-500/25 px-4 py-1 flex items-center justify-between">
+          <div className="flex items-center gap-2 text-[10px] font-mono text-slate-400">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span className="font-bold text-emerald-400 uppercase tracking-wider">CYBERZONE SYSTEM</span>
+          </div>
           <button
             type="button"
             onClick={() => setIsSystemDrawerOpen(true)}
-            onMouseEnter={() => setIsSystemDrawerOpen(true)}
-            className="group flex items-center gap-2 px-4 py-1.5 bg-[#020617]/95 border border-emerald-500/50 border-t-0 rounded-b-xl text-emerald-400 font-mono text-[11px] font-bold shadow-[0_4px_20px_rgba(16,185,129,0.35)] hover:bg-emerald-950/90 hover:border-emerald-400 hover:text-white transition-all cursor-pointer backdrop-blur-md"
-            title="Rê chuột hoặc click để trượt xuống thanh chuyển đổi 5 giao diện hệ thống"
+            className="group flex items-center gap-1.5 px-3 py-0.5 bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 rounded-md text-emerald-300 hover:text-white font-mono text-[10px] font-bold transition-all cursor-pointer"
+            title="Click để mở thanh chuyển đổi 5 giao diện hệ thống"
           >
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-            <span className="material-symbols-outlined text-[15px]">desktop_windows</span>
+            <span className="material-symbols-outlined text-[13px]">desktop_windows</span>
             <span>GIAO DIỆN HỆ THỐNG</span>
-            <span className="material-symbols-outlined text-[15px] group-hover:translate-y-0.5 transition-transform">
+            <span className="material-symbols-outlined text-[14px] group-hover:translate-y-0.5 transition-transform">
               keyboard_arrow_down
             </span>
           </button>
+          <div className="hidden sm:block text-[10px] font-mono text-slate-500">
+            5 Phân hệ vận hành
+          </div>
         </div>
       )}
 
-      
       <header
         className={
           isDedicatedSystem
-            ? `fixed top-0 left-0 right-0 z-[100] transition-all duration-300 ${
-                isSystemDrawerOpen || isPinned ? 'pointer-events-auto shadow-2xl' : 'pointer-events-none'
+            ? `relative z-50 w-full transition-all duration-200 ${
+                isSystemDrawerOpen || isPinned ? ' block shadow-xl' : 'hidden'
               }`
             : 'sticky top-0 z-50 flex flex-col bg-[#070d1e] shadow-2xl'
         }
       >
         <div
-          onMouseEnter={() => setIsSystemDrawerOpen(true)}
-          onMouseLeave={() => {
-            if (!isPinned) setIsSystemDrawerOpen(false);
-          }}
-          className={`bg-[#020617] border-b border-emerald-500/30 overflow-hidden transition-all duration-300 ease-in-out pointer-events-auto ${
-            isSystemDrawerOpen || isPinned
-              ? 'max-h-36 opacity-100 py-2.5 px-3 sm:px-4'
+          className={`bg-[#020617] border-b border-emerald-500/30 overflow-hidden transition-all duration-200 ease-in-out ${
+            !isDedicatedSystem || isSystemDrawerOpen || isPinned
+              ? 'max-h-40 opacity-100 py-2 px-3 sm:px-4'
               : 'max-h-0 opacity-0 py-0 px-3 sm:px-4 pointer-events-none border-b-0'
           }`}
         >
@@ -179,31 +178,35 @@ export default function GlobalNavBar() {
               );
             })}
 
-            <button
-              type="button"
-              onClick={() => setIsPinned(!isPinned)}
-              title={isPinned ? 'Bỏ ghim (tự động ẩn khi rời chuột)' : 'Ghim cố định thanh này'}
-              className={`px-2 py-1 rounded-lg text-[10px] font-mono font-bold flex items-center gap-1 transition cursor-pointer ${
-                isPinned
-                  ? 'bg-emerald-400 text-black shadow-md'
-                  : 'bg-slate-800 text-slate-400 hover:text-white border border-white/10'
-              }`}
-            >
-              <span className="material-symbols-outlined text-[13px]">{isPinned ? 'push_pin' : 'keep'}</span>
-              <span>{isPinned ? 'Đã ghim' : 'Ghim'}</span>
-            </button>
+            {isDedicatedSystem && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setIsPinned(!isPinned)}
+                  title={isPinned ? 'Bỏ ghim thanh hệ thống' : 'Ghim cố định thanh này'}
+                  className={`px-2 py-1 rounded-lg text-[10px] font-mono font-bold flex items-center gap-1 transition cursor-pointer ${
+                    isPinned
+                      ? 'bg-emerald-400 text-black shadow-md'
+                      : 'bg-slate-800 text-slate-400 hover:text-white border border-white/10'
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-[13px]">{isPinned ? 'push_pin' : 'keep'}</span>
+                  <span>{isPinned ? 'Đã ghim' : 'Ghim'}</span>
+                </button>
 
-            <button
-              type="button"
-              onClick={() => {
-                setIsPinned(false);
-                setIsSystemDrawerOpen(false);
-              }}
-              title="Thu gọn thanh hệ thống"
-              className="px-2 py-1 rounded-lg text-[10px] font-mono font-bold text-slate-400 hover:text-rose-400 border border-white/10 hover:border-rose-500/40 transition"
-            >
-              ✕
-            </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsPinned(false);
+                    setIsSystemDrawerOpen(false);
+                  }}
+                  title="Thu gọn thanh hệ thống"
+                  className="px-2 py-1 rounded-lg text-[10px] font-mono font-bold text-slate-400 hover:text-rose-400 border border-white/10 hover:border-rose-500/40 transition cursor-pointer"
+                >
+                  ✕ Thu gọn
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>
