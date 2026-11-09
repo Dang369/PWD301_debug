@@ -241,7 +241,11 @@ export default function MainServerPage() {
     const orders = getStoredOrders();
     const topups = calculateTotalTopupRevenue().totalTopup;
     const fnbTotal = orders
-      .filter((o) => o.status === 'READY' || o.status === 'DELIVERED')
+      .filter(
+        (o) =>
+          o.status === 'DELIVERED' ||
+          (o.status === 'READY' && o.paymentMethod === 'ACCOUNT_BALANCE')
+      )
       .reduce((sum, o) => sum + (o.totalAmount || 0), 0);
 
     if (

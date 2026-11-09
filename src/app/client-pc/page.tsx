@@ -499,6 +499,7 @@ export default function ClientPcPage() {
   useEffect(() => {
     const handleKdsReady = (detail: any) => {
       if (!detail || !detail.orderNumber) return;
+      if (detail.pcName && detail.pcName !== currentStation.id) return;
       if (isOrderDismissed(detail.orderNumber)) return;
       playDingSound();
       setKdsFoodNotice({
@@ -514,7 +515,10 @@ export default function ClientPcPage() {
         const parsed = JSON.parse(rawKds);
         if (parsed.orderNumber && isOrderDismissed(parsed.orderNumber)) {
           localStorage.removeItem('cyber_kds_food_ready');
-        } else if (Date.now() - (parsed.timestamp || 0) < 600000) {
+        } else if (
+          (!parsed.pcName || parsed.pcName === currentStation.id) &&
+          Date.now() - (parsed.timestamp || 0) < 600000
+        ) {
           setKdsFoodNotice({
             orderNumber: parsed.orderNumber,
             pcName: parsed.pcName || currentStation.id,
@@ -665,11 +669,10 @@ export default function ClientPcPage() {
     const handleLocalWalletUpdate = () => {
       const updatedWallet = getStoredWallet();
       setWallet(updatedWallet);
-      // Chỉ tự động mở khóa và nạp giờ nếu máy đang ở trạng thái khóa (Lễ tân nạp mở máy)
-      // Khi khách đang chơi, tuyệt đối KHÔNG ghi đè remainingSeconds để bảo toàn gói combo/giờ đã mua
-      if (isLocked) {
-        const activeRate = customRate > 0 ? customRate : currentStation.hourlyRate;
-        const calcSeconds = activeRate > 0 ? Math.floor((updatedWallet.balance / activeRate) * 3600) : 0;
+      const activeRate = updatedWallet.hourlyRate || customRate || currentStation.hourlyRate || 22000;
+      const calcSeconds = activeRate > 0 ? Math.max(0, Math.round((updatedWallet.balance / activeRate) * 3600)) : 0;
+      const currentlyUnlocked = localStorage.getItem('CYBER_CLIENT_PC_UNLOCKED') === 'true';
+      if (!currentlyUnlocked) {
         if (calcSeconds > 0) {
           setRemainingSeconds(calcSeconds);
           setIsLocked(false);
@@ -677,6 +680,8 @@ export default function ClientPcPage() {
           setAlertSuccess('🎉 QUẦY LỄ TÂN ĐÃ NẠP TIỀN CHO BẠN! Máy đã tự động mở khóa.');
           playDingSound();
         }
+      } else {
+        setRemainingSeconds(calcSeconds);
       }
     };
 
@@ -733,9 +738,10 @@ export default function ClientPcPage() {
         try {
           const updatedWallet = getStoredWallet();
           setWallet(updatedWallet);
-          if (isLocked) {
-            const activeRate = customRate > 0 ? customRate : currentStation.hourlyRate;
-            const calcSeconds = activeRate > 0 ? Math.floor((updatedWallet.balance / activeRate) * 3600) : 0;
+          const activeRate = updatedWallet.hourlyRate || customRate || currentStation.hourlyRate || 22000;
+          const calcSeconds = activeRate > 0 ? Math.max(0, Math.round((updatedWallet.balance / activeRate) * 3600)) : 0;
+          const currentlyUnlocked = localStorage.getItem('CYBER_CLIENT_PC_UNLOCKED') === 'true';
+          if (!currentlyUnlocked) {
             if (calcSeconds > 0) {
               setRemainingSeconds(calcSeconds);
               setIsLocked(false);
@@ -743,6 +749,8 @@ export default function ClientPcPage() {
               setAlertSuccess('🎉 QUẦY LỄ TÂN ĐÃ NẠP TIỀN CHO BẠN! Máy đã tự động mở khóa.');
               playDingSound();
             }
+          } else {
+            setRemainingSeconds(calcSeconds);
           }
         } catch {}
       }
@@ -1010,7 +1018,7 @@ export default function ClientPcPage() {
       saveClientPcSession(updatedUser);
     }
 
-    setRemainingSeconds((prev) => prev + addedSeconds);
+    setRemainingSeconds(Math.max(0, Math.round((updatedW.balance / effectiveRate) * 3600)));
     setIsLocked(false);
 
     saveActiveClientStation({

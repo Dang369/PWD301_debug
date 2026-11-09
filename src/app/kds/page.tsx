@@ -6,16 +6,39 @@ import { Order, OrderStatus, KdsFilterStation } from '@/types/fnb';
 import {
   getStoredOrders,
   updateOrderStatus,
+  toggleOrderItemCheck,
   clearCompletedOrders,
   resetOrdersToDefault,
   STORAGE_EVENT_NAME,
 } from '@/lib/orderStore';
+import { topupWallet } from '@/lib/walletStore';
 import {
   StaffRequest,
   getStoredStaffRequests,
   resolveStaffRequest,
   STAFF_REQUEST_EVENT,
 } from '@/lib/staffRequestStore';
+
+const DRINK_KEYWORDS = [
+  'sting',
+  'monster',
+  'red bull',
+  'trà đào',
+  'trà sữa',
+  'cà phê',
+  'soda',
+  'nước',
+  'pepsi',
+  'coca',
+];
+
+function isDrinkOrder(ord: Order): boolean {
+  if (ord.station === 'BAR') return true;
+  return ord.items.some((it) => {
+    const str = (typeof it === 'string' ? it : it.name || '').toLowerCase();
+    return DRINK_KEYWORDS.some((kw) => str.includes(kw));
+  });
+}
 
 export default function KitchenDisplaySystem() {
   const [currentTime, setCurrentTime] = useState('00:00:00');
@@ -86,16 +109,43 @@ export default function KitchenDisplaySystem() {
 
   const pendingCount = orders.filter((o) => o.status === 'PENDING').length;
   const cookingCount = orders.filter((o) => o.status === 'COOKING').length;
-  const readyCount = orders.filter((o) => o.status === 'READY' || o.status === 'DELIVERED').length;
+  const readyToDeliverCount = orders.filter((o) => o.status === 'READY').length;
+  const archivableCount = orders.filter((o) => o.status === 'DELIVERED' || o.status === 'CANCELLED').length;
   const pendingStaffRequests = staffRequests.filter((r) => r.status === 'PENDING' && r.target === 'KITCHEN');
 
+  const handleToggleItemCheck = (orderId: string, itemIdx: number) => {
+    const updated = toggleOrderItemCheck(orderId, itemIdx);
+    setOrders(updated);
+  };
+
   const handleUpdateStatus = (orderId: string, nextStatus: OrderStatus) => {
+    const existingOrder = orders.find((o) => o.id === orderId);
+    if (!existingOrder) return;
+
+    if (nextStatus === 'CANCELLED') {
+      const confirmMsg =
+        existingOrder.paymentMethod === 'ACCOUNT_BALANCE'
+          ? `Xác nhận HỦY đơn #${existingOrder.orderNumber} (${existingOrder.pcName}) và HOÀN LẠI +${existingOrder.totalAmount.toLocaleString('vi-VN')}đ vào ví cho khách?`
+          : `Xác nhận HỦY đơn #${existingOrder.orderNumber} (${existingOrder.pcName})?`;
+      if (!confirm(confirmMsg)) return;
+    }
+
     playSoundEffect(nextStatus === 'READY' || nextStatus === 'DELIVERED' ? 'success' : 'beep');
     const updated = updateOrderStatus(orderId, nextStatus);
     setOrders(updated);
 
     const target = updated.find((o) => o.id === orderId);
-    if ((nextStatus === 'READY' || nextStatus === 'DELIVERED') && target) {
+    if (!target) return;
+
+    if (nextStatus === 'COOKING') {
+      setRunnerNotification(
+        `🍳 Đã nhận đơn #${target.orderNumber} (${target.pcName}) — Bếp bắt đầu chế biến!`
+      );
+      setTimeout(() => setRunnerNotification(null), 3500);
+      return;
+    }
+
+    if (nextStatus === 'READY') {
       if (typeof window !== 'undefined') {
         const payload = {
           orderNumber: target.orderNumber,
@@ -109,7 +159,33 @@ export default function KitchenDisplaySystem() {
         } catch {}
       }
       setRunnerNotification(
-        `✓ Đã hoàn thành đơn #${target.orderNumber} (${target.pcName}) - Doanh thu +${target.totalAmount.toLocaleString('vi-VN')}đ đã được ghi nhận vào Bảng Thống Kê!`
+        `🔔 Đã chế biến xong đơn #${target.orderNumber} (${target.pcName})! Đã phát chuông báo Runner mang món ra bàn.`
+      );
+      setTimeout(() => setRunnerNotification(null), 4500);
+      return;
+    }
+
+    if (nextStatus === 'DELIVERED') {
+      setRunnerNotification(
+        `✓ Đã giao tận bàn đơn #${target.orderNumber} (${target.pcName}) — Doanh thu +${target.totalAmount.toLocaleString('vi-VN')}đ đã được ghi nhận vào Bảng Vận Hành!`
+      );
+      setTimeout(() => setRunnerNotification(null), 4500);
+      return;
+    }
+
+    if (nextStatus === 'CANCELLED') {
+      if (target.paymentMethod === 'ACCOUNT_BALANCE') {
+        topupWallet(
+          target.totalAmount,
+          'HOÀN TIỀN F&B',
+          `Hoàn tiền đơn F&B #${target.orderNumber} do bếp hủy đơn`,
+          target.pcName
+        );
+      }
+      setRunnerNotification(
+        target.paymentMethod === 'ACCOUNT_BALANCE'
+          ? `✕ Đã hủy đơn #${target.orderNumber} (${target.pcName}) và hoàn trả +${target.totalAmount.toLocaleString('vi-VN')}đ vào ví khách hàng!`
+          : `✕ Đã hủy đơn #${target.orderNumber} (${target.pcName})!`
       );
       setTimeout(() => setRunnerNotification(null), 4500);
     }
@@ -132,7 +208,7 @@ export default function KitchenDisplaySystem() {
         } catch {}
       }
       setRunnerNotification(
-        `🔔 Đã phát chuông điều phối Runner mang món đến máy ${targetOrder.pcName}!`
+        `🔔 Đã phát lại chuông điều phối Runner mang món đến máy ${targetOrder.pcName}!`
       );
       setTimeout(() => {
         setRunnerNotification(null);
@@ -141,16 +217,16 @@ export default function KitchenDisplaySystem() {
   };
 
   const handleClearCompleted = () => {
-    if (readyCount === 0) return;
+    if (archivableCount === 0) return;
     playSoundEffect('beep');
     const updated = clearCompletedOrders();
     setOrders(updated);
-    setRunnerNotification('✓ Đã lưu trữ và dọn sạch các đơn đã giao khỏi màn hình điều phối bếp!');
+    setRunnerNotification('✓ Đã lưu trữ và dọn sạch các đơn đã giao / đã hủy khỏi màn hình KDS!');
     setTimeout(() => setRunnerNotification(null), 3500);
   };
 
   const handleResetData = () => {
-    if (confirm('Khôi phục danh sách đơn bếp về mặc định ban đầu?')) {
+    if (confirm('Xóa toàn bộ danh sách đơn trên màn hình KDS?')) {
       const reset = resetOrdersToDefault();
       setOrders(reset);
     }
@@ -158,7 +234,8 @@ export default function KitchenDisplaySystem() {
 
   const filteredOrders = orders.filter((ord) => {
     if (stationFilter === 'ALL') return true;
-    return ord.station === stationFilter;
+    if (stationFilter === 'BAR') return isDrinkOrder(ord);
+    return ord.station === 'HOT_KITCHEN' || !isDrinkOrder(ord);
   });
 
   return (
@@ -172,15 +249,19 @@ export default function KitchenDisplaySystem() {
           <div className="flex flex-wrap gap-2">
             <span className="bg-rose-500/20 border border-rose-500/40 text-rose-400 px-3 py-1.5 rounded-lg text-xs font-bold font-mono flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-rose-500 inline-block animate-pulse"></span>
-              CHỜ XỬ LÝ: {pendingCount}
+              CHỜ NHẬN: {pendingCount}
             </span>
             <span className="bg-amber-500/20 border border-amber-500/40 text-amber-400 px-3 py-1.5 rounded-lg text-xs font-bold font-mono flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-amber-400 inline-block"></span>
               ĐANG NẤU: {cookingCount}
             </span>
+            <span className="bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 px-3 py-1.5 rounded-lg text-xs font-bold font-mono flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-cyan-400 inline-block animate-ping"></span>
+              CHỜ BƯNG: {readyToDeliverCount}
+            </span>
             <span className="bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 px-3 py-1.5 rounded-lg text-xs font-bold font-mono flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block"></span>
-              HOÀN THÀNH: {readyCount}
+              ĐÃ GIAO: {archivableCount}
             </span>
             {pendingStaffRequests.length > 0 && (
               <span className="bg-red-600/30 border border-red-500 text-rose-300 px-3 py-1.5 rounded-lg text-xs font-black font-mono flex items-center gap-1.5 animate-pulse">
@@ -194,38 +275,38 @@ export default function KitchenDisplaySystem() {
         <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => setStationFilter('ALL')}
-            className={`px-3 py-2 rounded-lg text-xs font-bold transition font-mono ${
+            className={`px-3 py-2 rounded-lg text-xs font-bold transition font-mono cursor-pointer ${
               stationFilter === 'ALL'
                 ? 'bg-cyan-500 text-black shadow-[0_0_12px_rgba(0,240,255,0.4)]'
                 : 'bg-[#141b2b] border border-slate-700 text-slate-300 hover:bg-[#1a233a]'
             }`}
           >
-            Tất cả trạm
+            Tất cả trạm ({orders.length})
           </button>
           <button
             onClick={() => setStationFilter('HOT_KITCHEN')}
-            className={`px-3 py-2 rounded-lg text-xs font-bold transition font-mono ${
+            className={`px-3 py-2 rounded-lg text-xs font-bold transition font-mono cursor-pointer ${
               stationFilter === 'HOT_KITCHEN'
                 ? 'bg-cyan-500 text-black shadow-[0_0_12px_rgba(0,240,255,0.4)]'
                 : 'bg-[#141b2b] border border-slate-700 text-slate-300 hover:bg-[#1a233a]'
             }`}
           >
-            🍳 Bếp Nóng
+            🍳 Bếp Nóng ({orders.filter((o) => o.station === 'HOT_KITCHEN' || !isDrinkOrder(o)).length})
           </button>
           <button
             onClick={() => setStationFilter('BAR')}
-            className={`px-3 py-2 rounded-lg text-xs font-bold transition font-mono ${
+            className={`px-3 py-2 rounded-lg text-xs font-bold transition font-mono cursor-pointer ${
               stationFilter === 'BAR'
                 ? 'bg-cyan-500 text-black shadow-[0_0_12px_rgba(0,240,255,0.4)]'
                 : 'bg-[#141b2b] border border-slate-700 text-slate-300 hover:bg-[#1a233a]'
             }`}
           >
-            🍹 Pha Chế Bar
+            🍹 Pha Chế Bar ({orders.filter((o) => isDrinkOrder(o)).length})
           </button>
 
           <button
             onClick={() => setAudioEnabled(!audioEnabled)}
-            className={`px-3 py-2 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+            className={`px-3 py-2 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
               audioEnabled
                 ? 'bg-rose-600 text-white shadow-md shadow-rose-600/30'
                 : 'bg-slate-800 text-slate-400 border border-slate-700'
@@ -239,19 +320,20 @@ export default function KitchenDisplaySystem() {
 
           <button
             onClick={handleClearCompleted}
-            disabled={readyCount === 0}
+            disabled={archivableCount === 0}
             className="bg-[#141b2b] hover:bg-emerald-500/20 disabled:opacity-40 text-emerald-400 border border-emerald-500/40 px-3 py-2 rounded-lg text-xs font-bold font-mono transition flex items-center gap-1 cursor-pointer"
-            title="Lưu trữ và ẩn các đơn đã hoàn tất khỏi màn hình KDS"
+            title="Chỉ lưu trữ các đơn ĐÃ GIAO TẬN BÀN hoặc ĐÃ HỦY (giữ nguyên các đơn đang chờ bưng)"
           >
-            <span className="material-symbols-outlined text-[16px]">done_all</span>
-            <span>Dọn Đơn Xong ({readyCount})</span>
+            <span className="material-symbols-outlined text-[16px]">inventory_2</span>
+            <span>Lưu Trữ Đơn Đã Giao ({archivableCount})</span>
           </button>
 
           <button
             onClick={handleResetData}
-            className="bg-[#141b2b] hover:bg-rose-950/40 text-slate-400 hover:text-rose-400 border border-slate-700 hover:border-rose-500/40 px-2.5 py-2 rounded-lg text-xs transition"
+            className="bg-[#141b2b] hover:bg-rose-950/40 text-slate-400 hover:text-rose-400 border border-slate-700 hover:border-rose-500/40 px-2.5 py-2 rounded-lg text-xs transition cursor-pointer"
+            title="Xóa toàn bộ đơn bếp"
           >
-            <span className="material-symbols-outlined text-[16px]">refresh</span>
+            <span className="material-symbols-outlined text-[16px]">delete_sweep</span>
           </button>
         </div>
       </header>
@@ -331,6 +413,7 @@ export default function KitchenDisplaySystem() {
               key={ord.id}
               order={ord}
               onUpdateStatus={handleUpdateStatus}
+              onToggleItemCheck={handleToggleItemCheck}
               onNotifyRunner={handleNotifyRunner}
             />
           ))}

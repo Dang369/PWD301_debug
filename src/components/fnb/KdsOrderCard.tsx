@@ -6,28 +6,37 @@ import { Order, OrderStatus } from '@/types/fnb';
 interface KdsOrderCardProps {
   order: Order;
   onUpdateStatus: (orderId: string, nextStatus: OrderStatus) => void;
+  onToggleItemCheck?: (orderId: string, itemIdx: number) => void;
   onNotifyRunner?: (orderId: string) => void;
 }
 
 export default function KdsOrderCard({
   order,
   onUpdateStatus,
+  onToggleItemCheck,
   onNotifyRunner,
 }: KdsOrderCardProps) {
   const isPending = order.status === 'PENDING';
   const isCooking = order.status === 'COOKING';
   const isReady = order.status === 'READY';
   const isDelivered = order.status === 'DELIVERED';
+  const isCancelled = order.status === 'CANCELLED';
 
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
-  const [checkedItems, setCheckedItems] = useState<{ [key: number]: boolean }>({});
   const [showThermalSlip, setShowThermalSlip] = useState(false);
 
+  const persistedChecked = Array.isArray(order.checkedIndices) ? order.checkedIndices : [];
+  const checkedCount =
+    isReady || isDelivered ? order.items.length : persistedChecked.length;
+  const allItemsChecked = order.items.length > 0 && checkedCount >= order.items.length;
+
   useEffect(() => {
-    if (isReady || isDelivered) {
-      if (order.cookingStartedAt && order.completedAt) {
-        const start = new Date(order.cookingStartedAt).getTime();
-        const end = new Date(order.completedAt).getTime();
+    if (isReady || isDelivered || isCancelled) {
+      const startIso = order.cookingStartedAt || order.createdAt;
+      const endIso = order.completedAt || order.deliveredAt || order.updatedAt;
+      if (startIso && endIso) {
+        const start = new Date(startIso).getTime();
+        const end = new Date(endIso).getTime();
         const diff = Math.max(0, Math.floor((end - start) / 1000));
         setElapsedSeconds(diff);
       }
@@ -36,7 +45,7 @@ export default function KdsOrderCard({
 
     const calculateElapsed = () => {
       const now = Date.now();
-      let startTime = 0;
+      let startTime = now;
 
       if (isCooking) {
         startTime = order.cookingStartedAt
@@ -56,7 +65,18 @@ export default function KdsOrderCard({
     const interval = setInterval(calculateElapsed, 1000);
 
     return () => clearInterval(interval);
-  }, [order.status, order.cookingStartedAt, order.createdAt, order.completedAt, isCooking, isReady, isDelivered]);
+  }, [
+    order.status,
+    order.cookingStartedAt,
+    order.createdAt,
+    order.completedAt,
+    order.deliveredAt,
+    order.updatedAt,
+    isCooking,
+    isReady,
+    isDelivered,
+    isCancelled,
+  ]);
 
   const formatTime = (totalSeconds: number) => {
     const mins = Math.floor(totalSeconds / 60);
@@ -66,11 +86,11 @@ export default function KdsOrderCard({
 
   const formattedTimer = formatTime(elapsedSeconds);
 
-  const toggleItemCheck = (idx: number) => {
-    setCheckedItems((prev) => ({
-      ...prev,
-      [idx]: !prev[idx],
-    }));
+  const handleItemRowClick = (idx: number) => {
+    if (!isCooking) return;
+    if (onToggleItemCheck) {
+      onToggleItemCheck(order.id, idx);
+    }
   };
 
   const getBorderColor = () => {
@@ -81,8 +101,9 @@ export default function KdsOrderCard({
       }
       return 'border-amber-500/60 shadow-[0_0_15px_rgba(255,183,3,0.25)]';
     }
-    if (isReady) return 'border-emerald-500/60 shadow-[0_0_15px_rgba(0,255,136,0.2)]';
-    return 'border-slate-800 opacity-60';
+    if (isReady) return 'border-cyan-400 shadow-[0_0_18px_rgba(0,240,255,0.25)]';
+    if (isCancelled) return 'border-rose-900/60 opacity-60';
+    return 'border-emerald-500/30 opacity-75';
   };
 
   const getTimerColor = () => {
@@ -99,10 +120,17 @@ export default function KdsOrderCard({
       return 'text-amber-400 bg-amber-950/40 border border-amber-500/40 font-bold';
     }
     if (isReady) {
-      return 'text-emerald-400 bg-emerald-950/40 border border-emerald-500/40 font-bold';
+      return 'text-cyan-300 bg-cyan-950/50 border border-cyan-500/50 font-bold';
     }
-    return 'text-slate-400 bg-slate-900 border border-slate-700';
+    if (isCancelled) {
+      return 'text-rose-400 bg-rose-950/40 border border-rose-800';
+    }
+    return 'text-emerald-400 bg-emerald-950/40 border border-emerald-500/40 font-bold';
   };
+
+  const orderCreatedTimeStr = order.createdAt
+    ? new Date(order.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    : new Date().toLocaleTimeString('vi-VN');
 
   return (
     <>
@@ -112,15 +140,32 @@ export default function KdsOrderCard({
         <div>
           <div className="flex justify-between items-start mb-3 pb-3 border-b border-slate-800">
             <div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-slate-400 font-mono font-bold tracking-wider">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-xs text-white font-mono font-black tracking-wider">
                   ĐƠN #{order.orderNumber}
                 </span>
-                <span className="text-[10px] px-1.5 py-0.2 rounded uppercase font-bold font-mono tracking-wider bg-[#141b2b] text-slate-300 border border-slate-700">
-                  {order.paymentMethod === 'ACCOUNT_BALANCE' ? 'VÍ TÀI KHOẢN' : 'TIỀN MẶT / QR'}
+                <span
+                  className={`text-[10px] px-1.5 py-0.5 rounded uppercase font-bold font-mono tracking-wider border ${
+                    order.station === 'BAR'
+                      ? 'bg-purple-500/20 text-purple-300 border-purple-500/40'
+                      : 'bg-orange-500/20 text-orange-300 border-orange-500/40'
+                  }`}
+                >
+                  {order.station === 'BAR' ? '🍹 QUẦY BAR' : '🍳 BẾP NÓNG'}
                 </span>
               </div>
-              <div className="text-xs text-slate-400 font-medium mt-0.5">{order.zoneName}</div>
+              <div className="text-xs text-slate-400 font-medium mt-1">{order.zoneName}</div>
+              <div className="mt-1.5 flex items-center gap-1.5">
+                {order.paymentMethod === 'ACCOUNT_BALANCE' ? (
+                  <span className="text-[10px] px-2 py-0.5 rounded font-bold font-mono bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                    ✓ ĐÃ TRỪ VÍ: {order.totalAmount.toLocaleString('vi-VN')}đ
+                  </span>
+                ) : (
+                  <span className="text-[10px] px-2 py-0.5 rounded font-bold font-mono bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                    💰 THU TẠI BÀN: {order.totalAmount.toLocaleString('vi-VN')}đ
+                  </span>
+                )}
+              </div>
             </div>
 
             <div className="text-right flex flex-col items-end">
@@ -129,7 +174,7 @@ export default function KdsOrderCard({
                 <button
                   type="button"
                   onClick={() => setShowThermalSlip(true)}
-                  className="px-1.5 py-0.5 bg-[#1a2438] hover:bg-cyan-500/20 text-slate-300 hover:text-cyan-300 border border-slate-700 rounded text-[10px] font-mono flex items-center gap-1 transition"
+                  className="px-1.5 py-0.5 bg-[#1a2438] hover:bg-cyan-500/20 text-slate-300 hover:text-cyan-300 border border-slate-700 rounded text-[10px] font-mono flex items-center gap-1 transition cursor-pointer"
                   title="In phiếu bếp 80mm"
                 >
                   <span className="material-symbols-outlined text-[13px]">print</span>
@@ -139,13 +184,23 @@ export default function KdsOrderCard({
                   className={`text-xs font-mono px-2 py-0.5 rounded inline-flex items-center gap-1 shadow-sm ${getTimerColor()}`}
                 >
                   <span className={`material-symbols-outlined text-[14px] ${isCooking ? 'animate-spin' : ''}`}>
-                    {isReady ? 'check_circle' : isCooking ? 'progress_activity' : 'timer'}
+                    {isDelivered
+                      ? 'task_alt'
+                      : isReady
+                      ? 'notifications_active'
+                      : isCooking
+                      ? 'progress_activity'
+                      : isCancelled
+                      ? 'cancel'
+                      : 'timer'}
                   </span>
                   <span>
-                    {isReady
-                      ? `XONG (${formattedTimer})`
-                      : isDelivered
+                    {isDelivered
                       ? 'ĐÃ GIAO'
+                      : isCancelled
+                      ? 'ĐÃ HỦY'
+                      : isReady
+                      ? `CHỜ GIAO (${formattedTimer})`
                       : formattedTimer}
                   </span>
                 </div>
@@ -153,11 +208,21 @@ export default function KdsOrderCard({
             </div>
           </div>
 
+          {isPending && (
+            <div className="flex items-center justify-between bg-rose-500/10 border border-rose-500/30 px-3 py-1.5 rounded-lg mb-3 text-xs text-rose-300 font-mono">
+              <span className="flex items-center gap-1.5 font-bold">
+                <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
+                1. CHỜ BẾP NHẬN ĐƠN
+              </span>
+              <span className="text-[10px] text-rose-400">Lúc {orderCreatedTimeStr}</span>
+            </div>
+          )}
+
           {isCooking && (
             <div className="flex items-center justify-between bg-amber-500/10 border border-amber-500/30 px-3 py-1.5 rounded-lg mb-3 text-xs text-amber-300 font-mono">
               <span className="flex items-center gap-1.5 font-bold">
                 <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
-                ĐANG NẤU...
+                2. ĐANG CHẾ BIẾN ({checkedCount}/{order.items.length} MÓN)
               </span>
               <span className="text-[11px] text-amber-400 font-bold">
                 {elapsedSeconds >= 480 ? '⚠️ QUÁ 8 PHÚT' : 'Cam kết < 8p'}
@@ -165,20 +230,34 @@ export default function KdsOrderCard({
             </div>
           )}
 
-          {isPending && (
-            <div className="flex items-center justify-between bg-rose-500/10 border border-rose-500/30 px-3 py-1.5 rounded-lg mb-3 text-xs text-rose-300 font-mono">
-              <span className="flex items-center gap-1.5 font-bold">
-                <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
-                CHỜ NHẬN BẾP
-              </span>
-              <span className="text-[11px] text-rose-400">Chờ nhận đơn</span>
+          {isReady && (
+            <div className="bg-cyan-500/15 border border-cyan-400/50 px-3 py-2 rounded-lg mb-3 text-xs text-cyan-200 font-mono space-y-1">
+              <div className="flex items-center justify-between font-bold">
+                <span className="flex items-center gap-1.5 text-cyan-300">
+                  <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span>
+                  3. MÓN ĐÃ XONG • CHỜ BƯNG RA {order.pcName}
+                </span>
+              </div>
+              {order.paymentMethod === 'CASH_OR_QR' && (
+                <div className="text-[11px] text-amber-300 font-bold bg-amber-950/60 px-2 py-1 rounded border border-amber-500/40">
+                  ⚠️ Runner lưu ý thu khách: {order.totalAmount.toLocaleString('vi-VN')}đ (Tiền mặt / QR)
+                </div>
+              )}
             </div>
           )}
 
           <div className="space-y-2 mb-4">
             <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex justify-between">
               <span>Danh sách món ({order.items.length})</span>
-              <span className="text-[10px] text-slate-500">Chạm để tick xong</span>
+              <span className="text-[10px] text-slate-400 font-mono">
+                {isPending
+                  ? 'Nhận đơn để bắt đầu chế biến'
+                  : isCooking
+                  ? `Chạm để tick món xong (${checkedCount}/${order.items.length})`
+                  : isReady || isDelivered
+                  ? '✓ Đã hoàn tất 100% món'
+                  : 'Đơn đã hủy'}
+              </span>
             </div>
 
             {order.items.map((item, idx) => {
@@ -188,21 +267,36 @@ export default function KdsOrderCard({
                   : `${item.quantity}x ${item.name || item.menuItemId}${
                       item.options ? ` (${item.options})` : ''
                     }`;
-              const isChecked = checkedItems[idx] || isReady || isDelivered;
+              const isChecked =
+                isReady || isDelivered || persistedChecked.includes(idx);
 
               return (
                 <div
                   key={idx}
-                  onClick={() => toggleItemCheck(idx)}
-                  className={`p-2.5 rounded-lg text-sm font-semibold cursor-pointer select-none transition-all flex items-center justify-between border ${
-                    isChecked
-                      ? 'bg-[#0f241a] border-emerald-500/40 text-emerald-200 line-through opacity-75'
-                      : 'bg-[#141b2b] border-slate-800 text-slate-200 hover:border-slate-700'
+                  onClick={() => handleItemRowClick(idx)}
+                  className={`p-2.5 rounded-lg text-sm font-semibold select-none transition-all flex items-center justify-between border ${
+                    isCancelled
+                      ? 'bg-slate-950 border-slate-800 text-slate-500 line-through'
+                      : isChecked
+                      ? 'bg-[#0f241a] border-emerald-500/40 text-emerald-200 line-through opacity-85'
+                      : isCooking
+                      ? 'bg-[#141b2b] border-amber-500/40 text-slate-100 hover:border-amber-400 cursor-pointer'
+                      : 'bg-[#141b2b] border-slate-800 text-slate-300 opacity-80 cursor-default'
                   }`}
                 >
                   <span>{itemText}</span>
-                  <span className="material-symbols-outlined text-[18px]">
-                    {isChecked ? 'check_box' : 'check_box_outline_blank'}
+                  <span
+                    className={`material-symbols-outlined text-[18px] ${
+                      isChecked ? 'text-emerald-400' : isCooking ? 'text-amber-400' : 'text-slate-600'
+                    }`}
+                  >
+                    {isCancelled
+                      ? 'block'
+                      : isChecked
+                      ? 'check_box'
+                      : isCooking
+                      ? 'check_box_outline_blank'
+                      : 'hourglass_empty'}
                   </span>
                 </div>
               );
@@ -221,51 +315,84 @@ export default function KdsOrderCard({
 
         <div className="pt-2">
           {isPending && (
-            <button
-              onClick={() => onUpdateStatus(order.id, 'COOKING')}
-              className="w-full bg-rose-600 hover:bg-rose-500 text-white font-black py-3 rounded-lg font-mono tracking-wide shadow-lg shadow-rose-600/30 active:scale-98 transition flex items-center justify-center gap-2 cursor-pointer"
-            >
-              <span className="material-symbols-outlined text-[20px]">skillet</span>
-              <span>🍳 NHẬN ĐƠN &amp; BẮT ĐẦU NẤU</span>
-            </button>
-          )}
-
-          {isCooking && (
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-4 gap-2">
               <button
-                onClick={() => onUpdateStatus(order.id, 'READY')}
-                className="bg-cyan-500 hover:bg-cyan-400 text-black font-black py-3 rounded-lg font-mono text-xs uppercase tracking-wider active:scale-98 transition flex items-center justify-center gap-1 shadow-[0_0_12px_rgba(0,240,255,0.4)] cursor-pointer"
+                type="button"
+                onClick={() => onUpdateStatus(order.id, 'COOKING')}
+                className="col-span-3 bg-rose-600 hover:bg-rose-500 text-white font-black py-3 px-2 rounded-lg font-mono text-xs tracking-wide shadow-lg shadow-rose-600/30 active:scale-98 transition flex items-center justify-center gap-1.5 cursor-pointer"
               >
-                <span className="material-symbols-outlined text-[16px]">done_all</span>
-                <span>✓ HOÀN THÀNH</span>
+                <span className="material-symbols-outlined text-[18px]">skillet</span>
+                <span>NHẬN ĐƠN &amp; NẤU</span>
               </button>
               <button
-                onClick={() => {
-                  if (onNotifyRunner) onNotifyRunner(order.id);
-                  onUpdateStatus(order.id, 'READY');
-                }}
-                className="bg-emerald-500 hover:bg-emerald-400 text-black font-black py-3 rounded-lg font-mono text-xs uppercase tracking-wider active:scale-98 transition flex items-center justify-center gap-1 shadow-[0_0_12px_rgba(16,185,129,0.4)] cursor-pointer"
+                type="button"
+                onClick={() => onUpdateStatus(order.id, 'CANCELLED')}
+                className="col-span-1 bg-slate-800 hover:bg-rose-950/80 text-slate-300 hover:text-rose-300 border border-slate-700 hover:border-rose-500/50 font-bold py-3 rounded-lg font-mono text-xs transition flex items-center justify-center cursor-pointer"
+                title="Từ chối / Hủy đơn và tự động hoàn tiền ví nếu khách đã trả trước"
               >
-                <span className="material-symbols-outlined text-[16px]">campaign</span>
-                <span>🔔 BÁO GIAO</span>
+                ✕ HỦY
               </button>
             </div>
           )}
 
-          {isReady && (
+          {isCooking && (
             <button
-              onClick={() => onUpdateStatus(order.id, 'DELIVERED')}
-              className="w-full bg-emerald-500 hover:bg-emerald-400 text-black font-black py-3 rounded-lg font-mono tracking-wide shadow-lg shadow-emerald-500/30 active:scale-98 transition flex items-center justify-center gap-2 cursor-pointer"
+              type="button"
+              onClick={() => onUpdateStatus(order.id, 'READY')}
+              className={`w-full font-black py-3 px-3 rounded-lg font-mono text-xs uppercase tracking-wider active:scale-98 transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                allItemsChecked
+                  ? 'bg-emerald-500 hover:bg-emerald-400 text-black shadow-[0_0_15px_rgba(16,185,129,0.5)]'
+                  : 'bg-amber-400 hover:bg-amber-300 text-black shadow-[0_0_12px_rgba(251,191,36,0.35)]'
+              }`}
             >
-              <span className="material-symbols-outlined text-[20px]">two_wheeler</span>
-              <span>🛵 ĐÃ GIAO CHO KHÁCH TẠI MÁY</span>
+              <span className="material-symbols-outlined text-[18px]">
+                {allItemsChecked ? 'notifications_active' : 'done_all'}
+              </span>
+              <span>
+                {allItemsChecked
+                  ? '🔔 ĐÃ NẤU XONG — BÁO RUNNER GIAO MÓN'
+                  : `⚡ XONG TẤT CẢ (${checkedCount}/${order.items.length}) & BÁO GIAO`}
+              </span>
             </button>
           )}
 
+          {isReady && (
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  if (onNotifyRunner) onNotifyRunner(order.id);
+                }}
+                className="col-span-1 bg-slate-800 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 font-bold py-3 px-2 rounded-lg font-mono text-[11px] transition flex items-center justify-center gap-1 cursor-pointer"
+                title="Phát lại chuông gọi Runner và nhắc thông báo trên màn hình máy khách"
+              >
+                <span className="material-symbols-outlined text-[16px]">campaign</span>
+                <span>Nhắc Chuông</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => onUpdateStatus(order.id, 'DELIVERED')}
+                className="col-span-2 bg-emerald-500 hover:bg-emerald-400 text-black font-black py-3 px-2 rounded-lg font-mono text-xs tracking-wide shadow-lg shadow-emerald-500/30 active:scale-98 transition flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[18px]">two_wheeler</span>
+                <span>🛵 ĐÃ GIAO TẬN BÀN</span>
+              </button>
+            </div>
+          )}
+
           {isDelivered && (
-            <div className="w-full bg-[#141b2b] border border-slate-700 text-slate-400 font-mono text-xs py-2.5 rounded-lg text-center flex items-center justify-center gap-1.5">
+            <div className="w-full bg-[#0f241a] border border-emerald-500/40 text-emerald-300 font-mono text-xs py-2.5 rounded-lg text-center flex items-center justify-center gap-1.5 font-bold">
               <span className="material-symbols-outlined text-emerald-400 text-[16px]">task_alt</span>
-              <span>ĐƠN HÀNG ĐÃ HOÀN TẤT</span>
+              <span>ĐÃ GIAO TẬN MÁY &amp; KHỚP DOANH THU</span>
+            </div>
+          )}
+
+          {isCancelled && (
+            <div className="w-full bg-rose-950/40 border border-rose-800/60 text-rose-300 font-mono text-xs py-2.5 rounded-lg text-center flex items-center justify-center gap-1.5 font-bold">
+              <span className="material-symbols-outlined text-rose-400 text-[16px]">cancel</span>
+              <span>
+                ĐƠN ĐÃ HỦY ({order.paymentMethod === 'ACCOUNT_BALANCE' ? 'ĐÃ HOÀN TIỀN VÍ' : 'KHÔNG THU TIỀN'})
+              </span>
             </div>
           )}
         </div>
@@ -275,14 +402,14 @@ export default function KdsOrderCard({
         <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white text-black font-mono w-full max-w-[340px] p-5 rounded-lg shadow-2xl border border-slate-300 select-text">
             <div className="text-center pb-3 border-b-2 border-dashed border-black">
-              <div className="font-black text-base uppercase">CYBERNET ESPORTS</div>
+              <div className="font-black text-base uppercase">CYBERZONE ESPORTS</div>
               <div className="text-[11px] font-bold uppercase tracking-wider">PHIẾU BẾP &amp; BAR (80MM)</div>
-              <div className="text-[10px] text-slate-700 mt-1">Trần Đại Nghĩa, Hai Bà Trưng, HN</div>
+              <div className="text-[10px] text-slate-700 mt-1">182 Lê Duẩn, P. Bến Thủy, TP. Vinh</div>
             </div>
 
             <div className="py-2.5 border-b border-dashed border-black text-xs space-y-1">
               <div className="flex justify-between font-bold text-sm">
-                <span>VỊ TRÍ:</span>
+                <span>VỊ TRÍ GIAO:</span>
                 <span className="bg-black text-white px-1.5 rounded">{order.pcName}</span>
               </div>
               <div className="flex justify-between">
@@ -295,27 +422,28 @@ export default function KdsOrderCard({
               </div>
               <div className="flex justify-between text-[11px]">
                 <span>Giờ đặt:</span>
-                <span>{new Date().toLocaleTimeString('vi-VN')}</span>
+                <span>{orderCreatedTimeStr}</span>
               </div>
               <div className="flex justify-between text-[11px]">
                 <span>Thanh toán:</span>
                 <span className="font-bold">
-                  {order.paymentMethod === 'ACCOUNT_BALANCE' ? 'Ví tài khoản máy' : 'Tiền mặt/QR'}
+                  {order.paymentMethod === 'ACCOUNT_BALANCE' ? 'Đã trừ Ví tài khoản' : 'Thu tại bàn (Tiền mặt/QR)'}
                 </span>
               </div>
             </div>
 
             <div className="py-3 border-b-2 border-dashed border-black">
               <div className="text-[11px] font-bold uppercase mb-1.5 flex justify-between">
-                <span>TÊN MÓN</span>
-                <span>SL</span>
+                <span>DANH SÁCH MÓN</span>
+                <span>TRẠNG THÁI</span>
               </div>
               <div className="space-y-1.5 text-xs">
                 {order.items.map((item, idx) => {
                   const text = typeof item === 'string' ? item : `${item.quantity}x ${item.name || item.menuItemId}`;
                   return (
-                    <div key={idx} className="font-bold leading-tight">
-                      • {text}
+                    <div key={idx} className="font-bold leading-tight flex justify-between gap-2">
+                      <span>• {text}</span>
+                      <span>✓</span>
                     </div>
                   );
                 })}
@@ -330,7 +458,7 @@ export default function KdsOrderCard({
             )}
 
             <div className="py-2.5 border-b-2 border-black flex justify-between font-bold text-sm">
-              <span>TỔNG TIỀN:</span>
+              <span>{order.paymentMethod === 'ACCOUNT_BALANCE' ? 'ĐÃ THANH TOÁN:' : 'CẦN THU KHÁCH:'}</span>
               <span>{order.totalAmount.toLocaleString('vi-VN')}đ</span>
             </div>
 
@@ -342,7 +470,7 @@ export default function KdsOrderCard({
               <button
                 type="button"
                 onClick={() => setShowThermalSlip(false)}
-                className="w-1/2 py-2 bg-slate-200 hover:bg-slate-300 text-black font-bold text-xs rounded transition uppercase"
+                className="w-1/2 py-2 bg-slate-200 hover:bg-slate-300 text-black font-bold text-xs rounded transition uppercase cursor-pointer"
               >
                 Đóng
               </button>
@@ -351,7 +479,7 @@ export default function KdsOrderCard({
                 onClick={() => {
                   window.print();
                 }}
-                className="w-1/2 py-2 bg-black hover:bg-slate-800 text-white font-bold text-xs rounded transition uppercase flex items-center justify-center gap-1"
+                className="w-1/2 py-2 bg-black hover:bg-slate-800 text-white font-bold text-xs rounded transition uppercase flex items-center justify-center gap-1 cursor-pointer"
               >
                 <span className="material-symbols-outlined text-[14px]">print</span>
                 <span>In Phiếu</span>

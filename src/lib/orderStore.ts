@@ -47,20 +47,53 @@ export function addOrder(newOrder: Order): Order[] {
   return updated;
 }
 
-export function updateOrderStatus(orderId: string, nextStatus: OrderStatus): Order[] {
+export function updateOrderStatus(
+  orderId: string,
+  nextStatus: OrderStatus,
+  cancelReason?: string
+): Order[] {
   const current = getStoredOrders();
   const nowIso = new Date().toISOString();
   const updated = current.map((ord) => {
     if (ord.id === orderId) {
       const isStartingCooking = nextStatus === 'COOKING' && !ord.cookingStartedAt;
-      const isDone = nextStatus === 'READY' || nextStatus === 'DELIVERED';
+      const isReady = nextStatus === 'READY';
+      const isDelivered = nextStatus === 'DELIVERED';
+      const isCancelled = nextStatus === 'CANCELLED';
+      const allIndices = ord.items.map((_, idx) => idx);
+
       return {
         ...ord,
         status: nextStatus,
+        checkedIndices: isReady || isDelivered ? allIndices : ord.checkedIndices || [],
         cookingStartedAt: isStartingCooking ? nowIso : ord.cookingStartedAt,
-        completedAt: isDone ? (ord.completedAt || nowIso) : ord.completedAt,
-        timeElapsed: isDone ? 'READY' : ord.timeElapsed,
+        completedAt: isReady || isDelivered ? (ord.completedAt || nowIso) : ord.completedAt,
+        deliveredAt: isDelivered ? (ord.deliveredAt || nowIso) : ord.deliveredAt,
+        cancelReason: isCancelled ? (cancelReason || 'Hết nguyên liệu / Khách hủy đơn') : ord.cancelReason,
+        timeElapsed: isDelivered ? 'DELIVERED' : isReady ? 'READY' : ord.timeElapsed,
         updatedAt: nowIso,
+      };
+    }
+    return ord;
+  });
+
+  broadcastOrdersUpdate(updated);
+  return updated;
+}
+
+export function toggleOrderItemCheck(orderId: string, itemIdx: number): Order[] {
+  const current = getStoredOrders();
+  const updated = current.map((ord) => {
+    if (ord.id === orderId) {
+      const prevChecked = Array.isArray(ord.checkedIndices) ? ord.checkedIndices : [];
+      const exists = prevChecked.includes(itemIdx);
+      const nextChecked = exists
+        ? prevChecked.filter((i) => i !== itemIdx)
+        : [...prevChecked, itemIdx];
+      return {
+        ...ord,
+        checkedIndices: nextChecked,
+        updatedAt: new Date().toISOString(),
       };
     }
     return ord;
@@ -84,7 +117,9 @@ export function deleteOrder(orderId: string): Order[] {
 
 export function clearCompletedOrders(): Order[] {
   const current = getStoredOrders();
-  const updated = current.filter((o) => o.status !== 'READY' && o.status !== 'DELIVERED');
+  // Chỉ dọn dẹp các đơn ĐÃ GIAO TẬN BÀN (DELIVERED) hoặc ĐÃ HỦY (CANCELLED)
+  // Tuyệt đối giữ lại các đơn READY (mới nấu xong, đang chờ Runner mang ra bàn cho khách)
+  const updated = current.filter((o) => o.status !== 'DELIVERED' && o.status !== 'CANCELLED');
   broadcastOrdersUpdate(updated);
   return updated;
 }
@@ -128,12 +163,18 @@ export function calculateLiveDashboardStats(
     return now - t <= maxAgeMs;
   });
 
+  // Đơn hàng chỉ được ghi nhận doanh thu thực tế khi ĐÃ GIAO TẬN BÀN (DELIVERED),
+  // hoặc đã nấu xong (READY) và khách đã trả trước qua Ví Tài Khoản (ACCOUNT_BALANCE)
   const completedOrders = filteredOrders.filter(
-    (o) => o.status === 'READY' || o.status === 'DELIVERED'
+    (o) =>
+      o.status === 'DELIVERED' ||
+      (o.status === 'READY' && o.paymentMethod === 'ACCOUNT_BALANCE')
   );
 
   const pendingOrders = filteredOrders.filter((o) => o.status === 'PENDING');
   const cookingOrders = filteredOrders.filter((o) => o.status === 'COOKING');
+  const readyOrders = filteredOrders.filter((o) => o.status === 'READY');
+  const deliveredOrders = filteredOrders.filter((o) => o.status === 'DELIVERED');
 
   const periodBaseRevenue =
     dateFilter === 'week' ? 4850000 : dateFilter === 'month' ? 19400000 : BASELINE_REVENUE;
@@ -192,11 +233,17 @@ export function calculateLiveDashboardStats(
     formattedRevenue: `${totalRevenue.toLocaleString('vi-VN')}đ`,
     liveCompletedRevenue,
     formattedLiveCompleted: `${liveCompletedRevenue.toLocaleString('vi-VN')}đ`,
-    totalOrdersCount: periodBaseCompletedCount + completedOrders.length + pendingOrders.length + cookingOrders.length,
-    completedCount: periodBaseCompletedCount + completedOrders.length,
+    totalOrdersCount:
+      periodBaseCompletedCount +
+      deliveredOrders.length +
+      readyOrders.length +
+      pendingOrders.length +
+      cookingOrders.length,
+    completedCount: periodBaseCompletedCount + deliveredOrders.length + readyOrders.length,
     pendingCount: pendingOrders.length,
     cookingCount: cookingOrders.length,
-    readyCount: completedOrders.length,
+    readyCount: readyOrders.length,
+    deliveredCount: deliveredOrders.length,
     recentCompletedOrders: completedOrders,
     bestSellers,
   };

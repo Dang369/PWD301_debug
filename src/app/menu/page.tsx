@@ -467,14 +467,26 @@ function CyberMenuClientContent() {
       try {
         const allOrders = getStoredOrders();
         const activeOrder = allOrders.find(
-          (o) => o.pcName === walletPcName && (o.status === 'PENDING' || o.status === 'COOKING')
+          (o) =>
+            o.pcName === walletPcName &&
+            (o.status === 'PENDING' || o.status === 'COOKING' || o.status === 'READY')
         );
         if (activeOrder) {
           setCurrentTicker({
             orderCode: `#KDS-${activeOrder.orderNumber}`,
             description: activeOrder.items.join(' + '),
-            eta: activeOrder.status === 'COOKING' ? '03:30' : '07:00',
-            progressPercent: activeOrder.status === 'COOKING' ? 65 : 25,
+            eta:
+              activeOrder.status === 'READY'
+                ? 'Đang bưng ra máy!'
+                : activeOrder.status === 'COOKING'
+                  ? '03:30'
+                  : '07:00',
+            progressPercent:
+              activeOrder.status === 'READY'
+                ? 90
+                : activeOrder.status === 'COOKING'
+                  ? 65
+                  : 25,
           });
         } else {
           setCurrentTicker(null);
@@ -545,6 +557,7 @@ function CyberMenuClientContent() {
           qty: 1,
           selectedOption,
           note: item.noteDetail,
+          categoryId: item.categoryId,
         },
       ];
     });
@@ -601,6 +614,9 @@ function CyberMenuClientContent() {
       setAccountBalance(deductRes.wallet.balance);
     }
 
+    const isAllDrinkOrder =
+      cart.length > 0 && cart.every((c) => c.categoryId === 'nuoc-uong');
+
     const newKdsOrder = {
       id: `ord-${newOrderNumber}`,
       orderNumber: newOrderNumber,
@@ -611,7 +627,7 @@ function CyberMenuClientContent() {
       totalAmount: total,
       timeElapsed: '00:01',
       note: note || undefined,
-      station: 'HOT_KITCHEN' as const,
+      station: isAllDrinkOrder ? ('BAR' as const) : ('HOT_KITCHEN' as const),
       items: cart.map(
         (c) => `${c.qty}x ${c.name}${c.selectedOption ? ` (${c.selectedOption})` : ''}`
       ),

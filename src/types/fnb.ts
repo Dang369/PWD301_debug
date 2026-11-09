@@ -31,6 +31,7 @@ export interface MenuItem {
 export interface CartItem {
   id: string;
   menuItemId: string;
+  categoryId?: string;
   name: string;
   price: number;
   qty: number;
@@ -59,11 +60,14 @@ export interface Order {
   totalAmount: number;
   note?: string | null;
   items: (OrderItem | string)[];
+  checkedIndices?: number[];
   timeElapsed?: string;
   station?: 'HOT_KITCHEN' | 'BAR' | 'SNACK';
   createdAt?: string | Date;
   cookingStartedAt?: string | Date;
   completedAt?: string | Date;
+  deliveredAt?: string | Date;
+  cancelReason?: string;
   updatedAt?: string | Date;
 }
 
