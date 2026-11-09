@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="vi" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}CYBER ZONE - Tổ Hợp Gaming Lounge & eSports Stadium 24/7{% endblock %}</title>
+    
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:ital,wght@0,400;0,500;0,600;0,700;1,700&family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
+    
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        gaming: ['"Chakra Petch"', 'sans-serif'],
+                        mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace']
+                    },
+                    colors: {
+                        cyber: {
+                            dark: '#030712',
+                            surface: '#0b1329',
+                            card: '#0f172a',
+                            neon: '#00f0ff',
+                            emerald: '#10b981',
+                            purple: '#a855f7'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        /* Tùy chỉnh thanh cuộn Cyberpunk */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #030712;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #1e293b;
+            border-radius: 4px;
+            border: 1px solid rgba(16, 185, 129, 0.2);
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #10b981;
+        }
+    </style>
+</head>
+<body class="bg-[#030712] text-slate-200 min-h-screen flex flex-col font-sans selection:bg-emerald-400 selection:text-black antialiased">
+
+    
+    <div class="bg-black/80 border-b border-white/10 text-[11px] text-slate-400 py-1.5 px-4 font-mono">
+        <div class="max-w-7xl mx-auto flex flex-wrap justify-between items-center gap-2">
+            <div class="flex items-center gap-4">
+                <span class="inline-flex items-center gap-1.5 text-emerald-400 font-bold">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> 
+                    ĐANG MỞ CỬA 24/7
+                </span>
+                <span class="hidden sm:inline">
+                    <i class="fa-solid fa-location-dot text-emerald-400 mr-1"></i> 182 Lê Duẩn, TP. Vinh (Gần ĐH Vinh)
+                </span>
+            </div>
+            <div class="flex items-center gap-4">
+                <span class="hidden md:inline">
+                    <i class="fa-solid fa-bolt text-amber-400 mr-1"></i> Tặng 100% nạp lần đầu cho Tân thủ
+                </span>
+                <a href="tel:19008888" class="text-cyan-400 hover:text-white transition font-bold">
+                    <i class="fa-solid fa-phone text-emerald-400 mr-1"></i> Hotline: 1900 8888
+                </a>
+            </div>
+        </div>
+    </div>
+
+    
+    <nav class="border-b border-white/10 bg-[#070d1e]/90 backdrop-blur-md sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
+            
+            
+            <a href="/" class="flex items-center gap-3 group flex-shrink-0">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400 via-teal-400 to-cyan-500 flex items-center justify-center text-black font-black text-xl shadow-lg shadow-emerald-500/20 group-hover:scale-105 transition">
+                    CZ
+                </div>
+                <div>
+                    <span class="text-xl md:text-2xl font-black tracking-wider text-white font-gaming block">CYBER<span class="text-emerald-400">ZONE</span></span>
+                    <span class="text-[9px] text-cyan-400 tracking-widest font-mono uppercase block -mt-1 font-bold">eSports & Complex</span>
+                </div>
+            </a>
+
+            
+            <div class="hidden lg:flex items-center gap-6 text-xs font-mono font-bold uppercase tracking-wider text-slate-300">
+                <a href="/" class="text-emerald-400 hover:text-emerald-300 transition">Trang chủ</a>
+                
+                
+                <div class="relative group">
+                    <button class="flex items-center gap-1.5 hover:text-emerald-400 transition py-2">
+                        Khu máy & Dịch vụ <i class="fa-solid fa-chevron-down text-[10px] group-hover:rotate-180 transition duration-300"></i>
+                    </button>
+                    <div class="absolute left-0 top-full hidden group-hover:block w-64 pt-2">
+                        <div class="p-3 bg-slate-900/95 border border-white/10 rounded-2xl shadow-2xl backdrop-blur-xl space-y-1">
+                            <a href="/#phan-khu" class="flex items-center gap-2.5 p-2 rounded-xl hover:bg-white/5 text-slate-300 hover:text-emerald-400 transition">
+                                <i class="fa-solid fa-desktop text-emerald-400 w-5"></i>
+                                <div>
+                                    <div class="font-bold text-white normal-case">Đấu Trường Esports</div>
+                                    <div class="text-[10px] text-slate-400 normal-case">RTX 5090 & Màn hình 540Hz</div>
+                                </div>
+                            </a>
+                            <a href="/#phan-khu" class="flex items-center gap-2.5 p-2 rounded-xl hover:bg-white/5 text-slate-300 hover:text-cyan-400 transition">
+                                <i class="fa-solid fa-circle-dot text-cyan-400 w-5"></i>
+                                <div>
+                                    <div class="font-bold text-white normal-case">Billiards Lounge</div>
+                                    <div class="text-[10px] text-slate-400 normal-case">10 Bàn Aileex & Min chuẩn</div>
+                                </div>
+                            </a>
+                            <a href="/#phan-khu" class="flex items-center gap-2.5 p-2 rounded-xl hover:bg-white/5 text-slate-300 hover:text-purple-400 transition">
+                                <i class="fa-solid fa-gamepad text-purple-400 w-5"></i>
+                                <div>
+                                    <div class="font-bold text-white normal-case">Console Suite</div>
+                                    <div class="text-[10px] text-slate-400 normal-case">PS5 Pro & OLED 75 inch</div>
+                                </div>
+                            </a>
+                            <a href="/#showroom" class="flex items-center gap-2.5 p-2 rounded-xl hover:bg-white/5 text-slate-300 hover:text-amber-400 transition">
+                                <i class="fa-solid fa-store text-amber-400 w-5"></i>
+                                <div>
+                                    <div class="font-bold text-white normal-case">Showroom & Gear Shop</div>
+                                    <div class="text-[10px] text-slate-400 normal-case">Gaming gear chính hãng</div>
+                                </div>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <a href="/#bang-gia" class="hover:text-emerald-400 transition">Bảng giá máy</a>
+                <a href="/#khach-hang" class="hover:text-emerald-400 transition">Khách VIP</a>
+                <a href="/#showroom" class="hover:text-emerald-400 transition">Showroom</a>
+            </div>
+
+            
+            <div class="flex items-center gap-2 sm:gap-3">
+                <a href="tel:19008888" class="hidden sm:flex items-center gap-1.5 text-xs font-mono font-bold text-slate-300 hover:text-white px-3 py-2 rounded-lg transition">
+                    <i class="fa-solid fa-phone text-emerald-400"></i> 1900 8888
+                </a>
+                
+                <a href="/#dat-cho" class="px-3.5 sm:px-4 py-2 bg-emerald-400 hover:bg-emerald-300 text-black font-extrabold text-xs rounded-xl shadow-lg shadow-emerald-500/30 transition uppercase font-sans">
+                    <span class="hidden sm:inline">ĐẶT MÁY TRƯỚC</span>
+                    <span class="sm:hidden">ĐẶT CHỖ</span>
+                </a>
+
+                {% if current_user.is_authenticated %}
+                    
+                    <a href="/auth/profile" class="flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-slate-900 border border-emerald-500/40 hover:border-emerald-400 transition">
+                        <div class="text-right font-mono text-[11px] hidden sm:block">
+                            <span class="text-white font-bold block">{{ current_user.username }}</span>
+                            <span class="text-emerald-400 font-bold">{{ "{:,.0f}".format(current_user.wallet.balance) if current_user.wallet else 0 }}đ</span>
+                        </div>
+                        <div class="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-xs border border-emerald-400">
+                            <i class="fa-solid {{ current_user.rank_info.icon if current_user.rank_info else 'fa-user' }}"></i>
+                        </div>
+                    </a>
+                    <a href="/auth/logout" class="w-8 h-8 rounded-lg bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 flex items-center justify-center text-xs transition" title="Đăng xuất">
+                        <i class="fa-solid fa-power-off"></i>
+                    </a>
+                {% else %}
+                    
+                    <a href="/auth/login" class="px-3.5 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white font-semibold text-xs transition flex items-center gap-1.5">
+                        <i class="fa-solid fa-arrow-right-to-bracket text-xs text-cyan-400"></i> Đăng nhập
+                    </a>
+                    <a href="/auth/register" class="hidden sm:inline-flex px-3.5 py-1.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 font-bold text-xs transition">
+                        Đăng ký
+                    </a>
+                {% endif %}
+
+                
+                <button id="mobile-menu-btn" class="lg:hidden w-9 h-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-300 hover:text-white">
+                    <i class="fa-solid fa-bars text-sm"></i>
+                </button>
+            </div>
+        </div>
+
+        
+        <div id="mobile-menu" class="hidden lg:hidden border-t border-white/10 bg-[#070d1e] px-4 py-4 space-y-3 font-mono text-xs font-bold uppercase">
+            <a href="/" class="block py-2 text-emerald-400">Trang chủ</a>
+            <a href="/#phan-khu" class="block py-2 text-slate-300 hover:text-emerald-400">Phân khu Gaming & Bida</a>
+            <a href="/#bang-gia" class="block py-2 text-slate-300 hover:text-emerald-400">Bảng giá giờ chơi</a>
+            <a href="/#khach-hang" class="block py-2 text-slate-300 hover:text-emerald-400">Khách hàng nổi tiếng</a>
+            <a href="/#showroom" class="block py-2 text-slate-300 hover:text-emerald-400">Showroom Gear</a>
+            <a href="/#dat-cho" class="block py-2 text-cyan-400">Giữ chỗ online</a>
+            {% if not current_user.is_authenticated %}
+                <div class="pt-3 border-t border-white/10 flex gap-2">
+                    <a href="/auth/login" class="flex-1 py-2 text-center rounded-lg bg-white/5 border border-white/10 text-white">Đăng nhập</a>
+                    <a href="/auth/register" class="flex-1 py-2 text-center rounded-lg bg-emerald-400 text-black font-extrabold">Đăng ký</a>
+                </div>
+            {% endif %}
+        </div>
+    </nav>
+
+    
+    <main class="flex-1 flex flex-col items-center justify-start w-full">
+        {% block content %}{% endblock %}
+    </main>
+
+    
+    <footer class="border-t border-white/10 bg-black/60 pt-16 pb-8 px-4 text-xs text-slate-400">
+        <div class="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10 pb-12 border-b border-white/10">
+            
+            
+            <div class="space-y-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-400 to-cyan-500 flex items-center justify-center text-black font-black text-lg">
+                        CZ
+                    </div>
+                    <span class="text-xl font-black text-white font-gaming">CYBER<span class="text-emerald-400">ZONE</span></span>
+                </div>
+                <p class="text-slate-400 text-xs leading-relaxed">
+                    Tổ hợp giải trí eSports chuẩn thi đấu IESF, Billiards Lounge nghệ thuật và dịch vụ F&B cao cấp 24/7 hàng đầu khu vực.
+                </p>
+                <div class="flex items-center gap-3 text-slate-400">
+                    <a href="#" class="w-8 h-8 rounded-lg bg-white/5 hover:bg-emerald-500/20 hover:text-emerald-400 flex items-center justify-center transition border border-white/10"><i class="fa-brands fa-facebook-f"></i></a>
+                    <a href="#" class="w-8 h-8 rounded-lg bg-white/5 hover:bg-cyan-500/20 hover:text-cyan-400 flex items-center justify-center transition border border-white/10"><i class="fa-brands fa-tiktok"></i></a>
+                    <a href="#" class="w-8 h-8 rounded-lg bg-white/5 hover:bg-purple-500/20 hover:text-purple-400 flex items-center justify-center transition border border-white/10"><i class="fa-brands fa-youtube"></i></a>
+                    <a href="#" class="w-8 h-8 rounded-lg bg-white/5 hover:bg-emerald-500/20 hover:text-emerald-400 flex items-center justify-center transition border border-white/10"><i class="fa-brands fa-discord"></i></a>
+                </div>
+            </div>
+
+            
+            <div class="space-y-3 font-mono">
+                <h4 class="font-bold text-white uppercase tracking-wider text-[11px] font-sans">PHÂN KHU TRẢI NGHIỆM</h4>
+                <ul class="space-y-2 text-[11px]">
+                    <li><a href="/#phan-khu" class="hover:text-emerald-400 transition"><i class="fa-solid fa-angle-right text-emerald-400 mr-1.5"></i> Đấu Trường Thi Đấu Main Arena</a></li>
+                    <li><a href="/#phan-khu" class="hover:text-emerald-400 transition"><i class="fa-solid fa-angle-right text-emerald-400 mr-1.5"></i> Khu Máy Cyber Pro 540Hz</a></li>
+                    <li><a href="/#phan-khu" class="hover:text-emerald-400 transition"><i class="fa-solid fa-angle-right text-emerald-400 mr-1.5"></i> Billiards Lounge 10 Bàn Aileex</a></li>
+                    <li><a href="/#phan-khu" class="hover:text-emerald-400 transition"><i class="fa-solid fa-angle-right text-emerald-400 mr-1.5"></i> Private Console Suite PS5 Pro</a></li>
+                    <li><a href="/#showroom" class="hover:text-emerald-400 transition"><i class="fa-solid fa-angle-right text-emerald-400 mr-1.5"></i> Showroom Phụ Kiện Gaming Gear</a></li>
+                </ul>
+            </div>
+
+            
+            <div class="space-y-3 font-mono">
+                <h4 class="font-bold text-white uppercase tracking-wider text-[11px] font-sans">HỖ TRỢ & HỘI VIÊN</h4>
+                <ul class="space-y-2 text-[11px]">
+                    <li><a href="/auth/profile" class="hover:text-emerald-400 transition"><i class="fa-solid fa-angle-right text-emerald-400 mr-1.5"></i> Chính Sách Hạng VIP & Nạp Thẻ</a></li>
+                    <li><a href="/#bang-gia" class="hover:text-emerald-400 transition"><i class="fa-solid fa-angle-right text-emerald-400 mr-1.5"></i> Biểu Phí Dịch Vụ Giờ Chơi</a></li>
+                    <li><a href="/#dat-cho" class="hover:text-emerald-400 transition"><i class="fa-solid fa-angle-right text-emerald-400 mr-1.5"></i> Đặt Chỗ Nhóm Thi Đấu & Clan</a></li>
+                    <li><a href="/auth/register" class="hover:text-emerald-400 transition"><i class="fa-solid fa-angle-right text-emerald-400 mr-1.5"></i> Đăng Ký Tài Khoản Tân Thủ</a></li>
+                    <li><span class="text-amber-400"><i class="fa-solid fa-headset mr-1.5"></i> CSKH 24/7: 1900 8888</span></li>
+                </ul>
+            </div>
+
+            
+            <div class="space-y-3">
+                <h4 class="font-bold text-white uppercase tracking-wider text-[11px]">HỆ THỐNG CƠ SỞ</h4>
+                <div class="p-3.5 rounded-xl bg-white/5 border border-white/10 space-y-1.5 text-[11px]">
+                    <div class="font-bold text-emerald-400 flex items-center gap-1.5">
+                        <i class="fa-solid fa-location-dot"></i> FLAGSHIP COMPLEX TP. VINH
+                    </div>
+                    <div class="text-slate-300">182 Lê Duẩn, P. Bến Thủy, TP. Vinh (Gần Đại học Vinh)</div>
+                    <div class="text-slate-400 font-mono text-[10px]">Thời gian: Mở cửa 24/7 (Có bãi đỗ ô tô)</div>
+                </div>
+                <div class="text-[11px] text-slate-400">
+                    Đối tác phần cứng chính thức: <span class="text-cyan-400 font-bold">ASUS ROG</span> • <span class="text-emerald-400 font-bold">MSI</span> • <span class="text-purple-400 font-bold">ZOWIE</span>
+                </div>
+            </div>
+
+        </div>
+
+        
+        <div class="max-w-7xl mx-auto pt-6 flex flex-col sm:flex-row justify-between items-center gap-3 text-[11px] text-slate-500 font-mono">
+            <div>
+                © 2026 <span class="text-white font-bold">CYBER ZONE COMPLEX</span>. All Rights Reserved.
+            </div>
+            <div class="text-slate-400">
+                Đồ án Web Quản Lý Phòng Net Cyber • <span class="text-emerald-400 font-bold">Nhóm 4 Thành Viên</span> (Python Flask & Supabase)
+            </div>
+        </div>
+    </footer>
+
+    
+    <script>
+        const btn = document.getElementById('mobile-menu-btn');
+        const menu = document.getElementById('mobile-menu');
+        if (btn && menu) {
+            btn.addEventListener('click', () => {
+                menu.classList.toggle('hidden');
+            });
+        }
+    </script>
+</body>
+</html>

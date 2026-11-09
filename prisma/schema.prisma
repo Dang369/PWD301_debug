@@ -1,0 +1,101 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ==========================================
+// Bảng tài khoản (Thành viên 1 - Thái)
+// ==========================================
+model User {
+  id        Int      @id @default(autoincrement())
+  username  String   @unique
+  password  String
+  role      String   @default("MEMBER")
+  balance   Float    @default(0)
+  createdAt DateTime @default(now())
+}
+
+// ==========================================
+// Bảng máy tính quán net (Thành viên 2)
+// ==========================================
+model Computer {
+  id          Int      @id @default(autoincrement())
+  name        String
+  zone        String
+  cpu         String
+  vga         String
+  hourlyPrice Float
+  status      String   @default("AVAILABLE")
+}
+
+// ==========================================
+// THÀNH VIÊN 3 (Minh Nhật): MENU F&B, GIỎ HÀNG & BẾP KDS
+// ==========================================
+
+enum OrderStatus {
+  PENDING      // Chờ xử lý / Đơn mới
+  COOKING      // Đang nấu
+  READY        // Sẵn sàng / Chờ runner bưng
+  DELIVERED    // Đã giao cho khách
+  CANCELLED    // Đã hủy
+}
+
+enum PaymentMethod {
+  ACCOUNT_BALANCE // Trừ ví tài khoản máy
+  CASH_OR_QR      // Tiền mặt / Quét QR tại máy
+}
+
+model Category {
+  id        String     @id @default(uuid())
+  name      String
+  slug      String     @unique
+  order     Int        @default(0)
+  items     MenuItem[]
+  createdAt DateTime   @default(now())
+}
+
+model MenuItem {
+  id            String         @id @default(uuid())
+  categoryId    String
+  category      Category       @relation(fields: [categoryId], references: [id])
+  name          String
+  price         Decimal        @db.Decimal(10, 2)
+  originalPrice Decimal?       @db.Decimal(10, 2)
+  image         String
+  prepTime      Int            @default(5) // Thời gian nấu (phút)
+  isAvailable   Boolean        @default(true)
+  isHot         Boolean        @default(false)
+  isBestSeller  Boolean        @default(false)
+  orderItems    OrderItem[]
+  createdAt     DateTime       @default(now())
+}
+
+model Order {
+  id            String         @id @default(uuid())
+  orderNumber   Int            @unique @default(autoincrement()) // Ví dụ #1043
+  pcName        String         // Ví dụ "MÁY: VIP-08"
+  zoneName      String         // Ví dụ "Zone VIP A - Tầng 2"
+  status        OrderStatus    @default(PENDING)
+  paymentMethod PaymentMethod  @default(ACCOUNT_BALANCE)
+  totalAmount   Decimal        @db.Decimal(10, 2)
+  note          String?
+  items         OrderItem[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+}
+
+model OrderItem {
+  id         String   @id @default(uuid())
+  orderId    String
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  menuItemId String
+  menuItem   MenuItem @relation(fields: [menuItemId], references: [id])
+  quantity   Int      @default(1)
+  unitPrice  Decimal  @db.Decimal(10, 2)
+  options    String?  // Ghi chú option: "Cay cấp 3, ốp la mềm"
+}
