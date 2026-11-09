@@ -429,6 +429,16 @@ export default function ClientPcPage() {
     refundedAmount?: number;
   } | null>(null);
 
+  const [kdsOutOfStockNotice, setKdsOutOfStockNotice] = useState<{
+    orderNumber: number | string;
+    pcName: string;
+    cancelledItemName: string;
+    refundAmount: number;
+    deductedBillAmount: number;
+    remainingCount: number;
+    allCancelled?: boolean;
+  } | null>(null);
+
   const [activePlayingGame, setActivePlayingGame] = useState<string | null>(null);
 
   useEffect(() => {
@@ -538,6 +548,25 @@ export default function ClientPcPage() {
       handleKdsReady(e.detail);
     };
 
+    const handleKdsItemCancelled = (detail: any) => {
+      if (!detail || !detail.orderNumber || !detail.cancelledItemName) return;
+      if (detail.pcName && detail.pcName !== currentStation.id) return;
+      playDingSound();
+      setKdsOutOfStockNotice({
+        orderNumber: detail.orderNumber,
+        pcName: detail.pcName || currentStation.id,
+        cancelledItemName: detail.cancelledItemName,
+        refundAmount: detail.refundAmount || 0,
+        deductedBillAmount: detail.deductedBillAmount || 0,
+        remainingCount: detail.remainingCount ?? 0,
+        allCancelled: Boolean(detail.allCancelled),
+      });
+    };
+
+    const handleCustomItemCancelledEvent = (e: any) => {
+      handleKdsItemCancelled(e.detail);
+    };
+
     const handleStorageKds = (e: StorageEvent) => {
       if (e.key === 'cyber_kds_food_ready' && e.newValue) {
         try {
@@ -545,13 +574,21 @@ export default function ClientPcPage() {
           handleKdsReady(parsed);
         } catch {}
       }
+      if (e.key === 'cyber_kds_item_cancelled' && e.newValue) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          handleKdsItemCancelled(parsed);
+        } catch {}
+      }
     };
 
     window.addEventListener('cyber_kds_food_ready', handleCustomKdsEvent);
+    window.addEventListener('cyber_kds_item_cancelled', handleCustomItemCancelledEvent);
     window.addEventListener('storage', handleStorageKds);
 
     return () => {
       window.removeEventListener('cyber_kds_food_ready', handleCustomKdsEvent);
+      window.removeEventListener('cyber_kds_item_cancelled', handleCustomItemCancelledEvent);
       window.removeEventListener('storage', handleStorageKds);
     };
   }, [currentStation.id]);
@@ -1212,7 +1249,46 @@ export default function ClientPcPage() {
           </div>
         )}
 
-        {kdsFoodNotice && (
+        {kdsOutOfStockNotice && (
+        <div className="bg-rose-600 text-white py-3 px-4 shadow-[0_0_30px_rgba(225,29,72,0.6)] flex items-center justify-between font-mono text-xs font-black z-50 border-b-2 border-amber-300">
+          <div className="max-w-7xl mx-auto w-full flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <span className="material-symbols-outlined text-2xl text-amber-300 animate-pulse">warning</span>
+              <div>
+                <span className="text-sm uppercase font-gaming block tracking-wide text-amber-200">
+                  ⚠️ BẾP TRẠM KDS BÁO HẾT MÓN SỚM — ĐƠN #{kdsOutOfStockNotice.orderNumber}
+                </span>
+                <span className="text-[11px] font-sans font-bold text-white block">
+                  Món &quot;{kdsOutOfStockNotice.cancelledItemName}&quot; hiện vừa hết nguyên liệu!
+                  {kdsOutOfStockNotice.refundAmount > 0
+                    ? ` Hệ thống đã hoàn trả ngay +${kdsOutOfStockNotice.refundAmount.toLocaleString('vi-VN')}đ vào Ví và cộng lại giờ chơi cho bạn.`
+                    : kdsOutOfStockNotice.deductedBillAmount > 0
+                    ? ` Đã trừ ngay -${kdsOutOfStockNotice.deductedBillAmount.toLocaleString('vi-VN')}đ khỏi hóa đơn thanh toán tại bàn.`
+                    : ''}
+                </span>
+                <span className="text-[11px] font-sans font-bold text-amber-200 block mt-0.5">
+                  {kdsOutOfStockNotice.remainingCount > 0
+                    ? `🍳 Bếp vẫn đang chế biến ${kdsOutOfStockNotice.remainingCount} món còn lại trong đơn. Bạn có thể vào GỌI MÓN F&B để chọn món khác thay thế!`
+                    : `Đơn #${kdsOutOfStockNotice.orderNumber} đã được hủy hoàn toàn. Mời bạn chọn món khác trong thực đơn F&B!`}
+                </span>
+              </div>
+            </div>
+            <button
+              onClick={() => {
+                setKdsOutOfStockNotice(null);
+                try {
+                  localStorage.removeItem('cyber_kds_item_cancelled');
+                } catch {}
+              }}
+              className="bg-slate-950 hover:bg-slate-900 text-amber-300 px-3.5 py-1.5 rounded-lg text-xs uppercase cursor-pointer shadow font-mono font-bold shrink-0"
+            >
+              ĐÃ HIỂU ✓
+            </button>
+          </div>
+        </div>
+      )}
+
+      {kdsFoodNotice && (
           <div className="relative z-20 w-full mb-3 bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-400 text-slate-950 py-3 px-4 rounded-xl shadow-[0_0_35px_rgba(16,185,129,0.6)] flex items-center justify-between font-mono text-xs font-black animate-bounce border-2 border-white">
             <div className="flex items-center gap-2.5">
               <span className="material-symbols-outlined text-2xl text-slate-950 animate-spin">soup_kitchen</span>
@@ -1497,6 +1573,45 @@ export default function ClientPcPage() {
               className="bg-slate-950 text-white px-3 py-1 rounded-lg text-[10px] cursor-pointer"
             >
               ĐÃ ĐỌC ✓
+            </button>
+          </div>
+        </div>
+      )}
+
+      {kdsOutOfStockNotice && (
+        <div className="bg-rose-600 text-white py-3 px-4 shadow-[0_0_30px_rgba(225,29,72,0.6)] flex items-center justify-between font-mono text-xs font-black z-50 border-b-2 border-amber-300">
+          <div className="max-w-7xl mx-auto w-full flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <span className="material-symbols-outlined text-2xl text-amber-300 animate-pulse">warning</span>
+              <div>
+                <span className="text-sm uppercase font-gaming block tracking-wide text-amber-200">
+                  ⚠️ BẾP TRẠM KDS BÁO HẾT MÓN SỚM — ĐƠN #{kdsOutOfStockNotice.orderNumber}
+                </span>
+                <span className="text-[11px] font-sans font-bold text-white block">
+                  Món &quot;{kdsOutOfStockNotice.cancelledItemName}&quot; hiện vừa hết nguyên liệu!
+                  {kdsOutOfStockNotice.refundAmount > 0
+                    ? ` Hệ thống đã hoàn trả ngay +${kdsOutOfStockNotice.refundAmount.toLocaleString('vi-VN')}đ vào Ví và cộng lại giờ chơi cho bạn.`
+                    : kdsOutOfStockNotice.deductedBillAmount > 0
+                    ? ` Đã trừ ngay -${kdsOutOfStockNotice.deductedBillAmount.toLocaleString('vi-VN')}đ khỏi hóa đơn thanh toán tại bàn.`
+                    : ''}
+                </span>
+                <span className="text-[11px] font-sans font-bold text-amber-200 block mt-0.5">
+                  {kdsOutOfStockNotice.remainingCount > 0
+                    ? `🍳 Bếp vẫn đang chế biến ${kdsOutOfStockNotice.remainingCount} món còn lại trong đơn. Bạn có thể vào GỌI MÓN F&B để chọn món khác thay thế!`
+                    : `Đơn #${kdsOutOfStockNotice.orderNumber} đã được hủy hoàn toàn. Mời bạn chọn món khác trong thực đơn F&B!`}
+                </span>
+              </div>
+            </div>
+            <button
+              onClick={() => {
+                setKdsOutOfStockNotice(null);
+                try {
+                  localStorage.removeItem('cyber_kds_item_cancelled');
+                } catch {}
+              }}
+              className="bg-slate-950 hover:bg-slate-900 text-amber-300 px-3.5 py-1.5 rounded-lg text-xs uppercase cursor-pointer shadow font-mono font-bold shrink-0"
+            >
+              ĐÃ HIỂU ✓
             </button>
           </div>
         </div>

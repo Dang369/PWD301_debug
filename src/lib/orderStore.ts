@@ -151,23 +151,14 @@ export function updateOrderStatus(
       const itemPrices = estimateOrderItemPrices(ord);
 
       if (isReady && ord.status === 'COOKING') {
-        if (prevChecked.length > 0 && prevChecked.length < ord.items.length) {
-          // Bếp chỉ chọn một phần món (ví dụ 2/3 món), các món không được chọn chuyển sang danh sách báo hết / hủy lẻ
-          nextChecked = prevChecked;
-          nextCancelled = allIndices.filter((i) => !prevChecked.includes(i));
-          const deliveredSum = nextChecked.reduce((sum, idx) => sum + (itemPrices[idx] || 0), 0);
-          nextRefundedAmount = Math.max(0, nextOriginalTotal - deliveredSum);
-          nextTotalAmount = deliveredSum;
-        } else {
-          // Đã chọn đủ 100% món
-          nextChecked = allIndices;
-          nextCancelled = [];
-        }
+        const activeIndices = allIndices.filter((i) => !prevCancelled.includes(i));
+        nextChecked = activeIndices;
+        nextCancelled = prevCancelled;
       } else if (isDelivered) {
         // Giữ nguyên các món đã hoàn thành và các món bị hủy lẻ từ bước READY
         nextChecked =
           prevChecked.length > 0
-            ? prevChecked
+            ? prevChecked.filter((i) => !prevCancelled.includes(i))
             : allIndices.filter((i) => !prevCancelled.includes(i));
       }
 
@@ -199,6 +190,8 @@ export function toggleOrderItemCheck(orderId: string, itemIdx: number): Order[] 
   const current = getStoredOrders();
   const updated = current.map((ord) => {
     if (ord.id === orderId) {
+      const prevCancelled = Array.isArray(ord.cancelledIndices) ? ord.cancelledIndices : [];
+      if (prevCancelled.includes(itemIdx)) return ord;
       const prevChecked = Array.isArray(ord.checkedIndices) ? ord.checkedIndices : [];
       const exists = prevChecked.includes(itemIdx);
       const nextChecked = exists
@@ -215,6 +208,69 @@ export function toggleOrderItemCheck(orderId: string, itemIdx: number): Order[] 
 
   broadcastOrdersUpdate(updated);
   return updated;
+}
+
+export function cancelSingleOrderItem(
+  orderId: string,
+  itemIdx: number
+): {
+  orders: Order[];
+  refundAmount: number;
+  cancelledItemName: string;
+  allCancelled: boolean;
+} {
+  const current = getStoredOrders();
+  let refundAmount = 0;
+  let cancelledItemName = '';
+  let allCancelled = false;
+  const nowIso = new Date().toISOString();
+
+  const updated = current.map((ord) => {
+    if (ord.id === orderId) {
+      const prevCancelled = Array.isArray(ord.cancelledIndices) ? ord.cancelledIndices : [];
+      if (prevCancelled.includes(itemIdx)) return ord;
+
+      const itemPrices = estimateOrderItemPrices(ord);
+      const origTotal = ord.originalTotalAmount || ord.totalAmount;
+      const itemPrice = itemPrices[itemIdx] || 0;
+      refundAmount = itemPrice;
+
+      const rawItem = ord.items[itemIdx];
+      cancelledItemName =
+        typeof rawItem === 'string'
+          ? rawItem
+          : `${rawItem?.quantity || 1}x ${rawItem?.name || rawItem?.menuItemId || 'Món F&B'}`;
+
+      const nextCancelled = [...prevCancelled, itemIdx];
+      const prevChecked = Array.isArray(ord.checkedIndices) ? ord.checkedIndices : [];
+      const nextChecked = prevChecked.filter((i) => i !== itemIdx);
+
+      const activeIndices = ord.items
+        .map((_, idx) => idx)
+        .filter((i) => !nextCancelled.includes(i));
+      const nextTotalAmount = activeIndices.reduce((sum, idx) => sum + (itemPrices[idx] || 0), 0);
+      const nextRefundedAmount = Math.max(0, origTotal - nextTotalAmount);
+
+      allCancelled = activeIndices.length === 0;
+
+      return {
+        ...ord,
+        status: allCancelled ? ('CANCELLED' as OrderStatus) : ord.status,
+        itemPrices,
+        checkedIndices: nextChecked,
+        cancelledIndices: nextCancelled,
+        totalAmount: nextTotalAmount,
+        originalTotalAmount: origTotal,
+        refundedAmount: nextRefundedAmount,
+        cancelReason: allCancelled ? 'Đã báo hết toàn bộ các món trong đơn' : ord.cancelReason,
+        updatedAt: nowIso,
+      };
+    }
+    return ord;
+  });
+
+  broadcastOrdersUpdate(updated);
+  return { orders: updated, refundAmount, cancelledItemName, allCancelled };
 }
 
 export function resetOrdersToDefault(): Order[] {
