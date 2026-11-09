@@ -781,46 +781,71 @@ export default function ClientPcPage() {
   useEffect(() => {
     if (isLocked) return;
 
-    let elapsedSeconds = 0;
-
     const timer = setInterval(() => {
       setRemainingSeconds((prev) => {
         if (prev <= 1) {
           setIsLocked(true);
           setAlertSuccess('⚠️ HẾT THỜI GIAN CHƠI! Máy ' + currentStation.id + ' đã tự động khóa. Vui lòng nạp thêm tiền tại quầy hoặc qua cổng nạp.');
+          const zeroRes = deductPlayTimeFee(
+            999999999,
+            currentStation.id,
+            `Hết thời gian chơi tại ${currentStation.id}`
+          );
+          setWallet(zeroRes.wallet);
           return 0;
         }
-        return prev - 1;
-      });
 
-      elapsedSeconds += 1;
-      if (elapsedSeconds >= 30) {
-        elapsedSeconds = 0;
+        const nextSecs = prev - 1;
         const effectiveRate = customRate > 0 ? customRate : currentStation.hourlyRate;
-        const tickFee = Math.max(1, Math.round(effectiveRate / 120));
-        const res = deductPlayTimeFee(
-          tickFee,
-          currentStation.id,
-          `Trừ tự động 30 giây giờ chơi tại ${currentStation.id} (${effectiveRate.toLocaleString('vi-VN')}đ/h)`
-        );
-        if (res.success) {
-          setWallet(res.wallet);
-          if (res.wallet.balance <= 0) {
-            setIsLocked(true);
-            setRemainingSeconds(0);
+        const nextBal = Math.max(0, Math.round((nextSecs / 3600) * effectiveRate));
+
+        setWallet((prevW) => {
+          if (prevW.balance === nextBal) return prevW;
+          const updatedW = { ...prevW, balance: nextBal };
+          if (typeof window !== 'undefined') {
+            try {
+              localStorage.setItem(STORAGE_KEY_WALLET, JSON.stringify(updatedW));
+              const rawAuth = localStorage.getItem('cyber_auth_current_user');
+              if (rawAuth) {
+                const parsedAuth = JSON.parse(rawAuth);
+                parsedAuth.balance = nextBal;
+                localStorage.setItem('cyber_auth_current_user', JSON.stringify(parsedAuth));
+              }
+              const rawSession = localStorage.getItem('cyber_client_pc_session');
+              if (rawSession) {
+                const parsedSession = JSON.parse(rawSession);
+                parsedSession.balance = nextBal;
+                localStorage.setItem('cyber_client_pc_session', JSON.stringify(parsedSession));
+              }
+              const rawAccounts = localStorage.getItem('cyber_registered_accounts');
+              if (rawAccounts) {
+                const accounts = JSON.parse(rawAccounts);
+                const activeUname = currentUser?.username?.toLowerCase();
+                if (Array.isArray(accounts)) {
+                  const updatedAccs = accounts.map((acc: any) => {
+                    if ((activeUname && acc.username?.toLowerCase() === activeUname) || acc.fullName === updatedW.userName) {
+                      return { ...acc, balance: nextBal };
+                    }
+                    return acc;
+                  });
+                  localStorage.setItem('cyber_registered_accounts', JSON.stringify(updatedAccs));
+                }
+              }
+              const rawActive = localStorage.getItem('cyber_active_station');
+              if (rawActive) {
+                const parsedActive = JSON.parse(rawActive);
+                parsedActive.balance = nextBal;
+                parsedActive.hourlyRate = effectiveRate;
+                parsedActive.updatedAt = Date.now();
+                localStorage.setItem('cyber_active_station', JSON.stringify(parsedActive));
+              }
+            } catch {}
           }
-        }
-        saveActiveClientStation({
-          stationId: currentStation.id,
-          stationName: currentStation.name,
-          zone: currentStation.zone,
-          hourlyRate: effectiveRate,
-          occupantName: currentUser?.fullName || res.wallet.userName,
-          occupantTier: currentUser?.userTier || res.wallet.userTier,
-          balance: res.wallet.balance,
-          isOnline: res.wallet.balance > 0,
+          return updatedW;
         });
-      }
+
+        return nextSecs;
+      });
     }, 1000);
 
     return () => clearInterval(timer);
@@ -1136,7 +1161,10 @@ export default function ClientPcPage() {
     }
   };
 
-  const liveBalance = Math.max(0, wallet.balance > 0 ? wallet.balance : Math.round((remainingSeconds / 3600) * (customRate || currentStation.hourlyRate)));
+  const effectiveHourlyRate = customRate > 0 ? customRate : currentStation.hourlyRate;
+  const liveBalance = isLocked
+    ? 0
+    : Math.max(0, Math.round((remainingSeconds / 3600) * effectiveHourlyRate));
 
   if (isRebooting) {
     return (
@@ -1597,7 +1625,7 @@ export default function ClientPcPage() {
               <span className="hidden lg:inline">{isFullscreen ? 'Thu nhỏ' : 'Toàn màn hình'}</span>
             </button>
 
-            <div className="text-right hidden xl:block font-mono">
+            <div className="text-right block font-mono">
               <div className="flex items-center justify-end gap-1.5 text-xs">
                 <span className="text-white font-bold">{currentUser?.fullName || wallet.userName}</span>
                 {(() => {

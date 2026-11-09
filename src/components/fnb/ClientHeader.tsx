@@ -37,7 +37,12 @@ export default function ClientHeader({
   const [requestNote, setRequestNote] = useState('');
   const [destination, setDestination] = useState<'SERVER' | 'KITCHEN'>('SERVER');
   const [displayTime, setDisplayTime] = useState(remainingTime);
+  const [displayBalance, setDisplayBalance] = useState(balance);
   const [activeGame, setActiveGame] = useState<string | null>(null);
+
+  useEffect(() => {
+    setDisplayBalance(balance);
+  }, [balance]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -60,6 +65,8 @@ export default function ClientHeader({
       return;
     }
     let totalSecs = parts[0] * 3600 + parts[1] * 60 + parts[2];
+    const initialSecs = Math.max(1, totalSecs);
+    const initialBal = balance;
 
     const interval = setInterval(() => {
       totalSecs = Math.max(0, totalSecs - 1);
@@ -67,10 +74,13 @@ export default function ClientHeader({
       const m = String(Math.floor((totalSecs % 3600) / 60)).padStart(2, '0');
       const s = String(totalSecs % 60).padStart(2, '0');
       setDisplayTime(`${h}:${m}:${s}`);
+
+      const nextBal = Math.max(0, Math.round((totalSecs / initialSecs) * initialBal));
+      setDisplayBalance(nextBal);
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [remainingTime]);
+  }, [remainingTime, balance]);
 
   const handleSubmitStaffRequest = (e: React.FormEvent) => {
     e.preventDefault();
@@ -143,7 +153,7 @@ export default function ClientHeader({
               <div className="flex flex-col leading-none">
                 <span className="text-[10px] text-slate-400 font-semibold uppercase">Số dư tài khoản</span>
                 <span className="font-gaming text-[15px] font-extrabold text-secondary tracking-wide">
-                  {balance.toLocaleString('vi-VN')}<span className="text-[11px]">đ</span>
+                  {displayBalance.toLocaleString('vi-VN')}<span className="text-[11px]">đ</span>
                 </span>
               </div>
               <button
